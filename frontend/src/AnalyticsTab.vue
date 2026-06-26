@@ -60,20 +60,21 @@
     </div>
 
     <!-- SUB-TABS -->
-    <div class="flex gap-2 flex-wrap">
-      <button
-        v-for="tab in subTabs"
-        :key="tab.id"
-        @click="switchSubTab(tab.id)"
-        :class="[
-          'px-4 py-2 rounded-lg font-medium transition text-sm border',
-          activeSubTab === tab.id
-            ? 'bg-blue-600 text-white border-blue-600'
-            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
-        ]"
-      >
-        {{ tab.icon }} {{ tab.name }}
-      </button>
+    <div class="flex gap-1.5 flex-wrap items-center">
+      <template v-for="(tab, i) in subTabs" :key="tab.id">
+        <div v-if="i > 0 && tab.group !== subTabs[i-1].group" class="w-px h-6 bg-gray-300 mx-0.5 self-center flex-shrink-0"></div>
+        <button
+          @click="switchSubTab(tab.id)"
+          :class="[
+            'px-3 py-1.5 rounded-lg font-medium transition text-sm border',
+            activeSubTab === tab.id
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+          ]"
+        >
+          {{ tab.icon }} {{ tab.name }}
+        </button>
+      </template>
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════ -->
@@ -93,6 +94,9 @@
             <canvas ref="standingsZScoreCanvas"></canvas>
           </ChartBox>
         </div>
+        <ChartBox title="📦 Distribuição de Pontos por Zona Competitiva">
+          <canvas ref="standingsBpCanvas"></canvas>
+        </ChartBox>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatsCard v-for="(s, k) in standingsData.statistics" :key="k" :stat="s" />
         </div>
@@ -118,6 +122,9 @@
             <canvas ref="scorersEffCanvas"></canvas>
           </ChartBox>
         </div>
+        <ChartBox title="📦 Distribuição de Gols (Todos · Destaques · Regulares)">
+          <canvas ref="scorersBpCanvas"></canvas>
+        </ChartBox>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatsCard v-for="(s, k) in scorersData.statistics" :key="k" :stat="s" />
         </div>
@@ -316,6 +323,9 @@
             <canvas ref="predictBarCanvas"></canvas>
           </ChartBox>
         </div>
+        <ChartBox title="📈 Trajetória Projetada — Top 8 Times (Início → Final)">
+          <canvas ref="predictTrajCanvas"></canvas>
+        </ChartBox>
 
         <!-- Tabela de previsões -->
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
@@ -489,12 +499,15 @@
         <p class="text-xs text-gray-400 mt-2">Random Forest + Regressão Logística + SHAP por time.</p>
       </div>
       <template v-else>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <ChartBox title="📊 Importância das Features (RF vs SHAP)">
             <canvas ref="zoneFeatCanvas"></canvas>
           </ChartBox>
           <ChartBox title="🏟️ Distribuição de Zonas">
             <canvas ref="zoneDistCanvas"></canvas>
+          </ChartBox>
+          <ChartBox title="🔵 Dispersão Pts/Jogo × Gols/Jogo por Zona RF">
+            <canvas ref="zoneScatterCanvas"></canvas>
           </ChartBox>
         </div>
 
@@ -544,7 +557,7 @@
                     <span :class="zoneBadgeCls(item.lr_zone)" class="px-2 py-0.5 rounded text-xs font-medium">{{ item.lr_zone_label }}</span>
                   </td>
                   <td class="px-4 py-3">
-                    <div class="flex h-2 rounded overflow-hidden w-24">
+                    <div class="flex h-2 rounded overflow-hidden w-40">
                       <div v-for="z in 4" :key="z" :style="{ width: Math.max((item.rf_proba[z-1] || 0) * 100, 0) + '%', backgroundColor: zoneColors[z-1] }"></div>
                     </div>
                     <div class="text-gray-500 text-xs mt-0.5">{{ ((item.rf_proba[item.rf_zone] || 0) * 100).toFixed(0) }}%</div>
@@ -691,6 +704,132 @@
         </div>
 
         <InsightPanel :insights="archetypeData.insights" />
+      </template>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- COMPARAÇÃO: Times e Jogadores                              -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div v-show="activeSubTab === 'comparacao'" class="space-y-6">
+      <div v-if="!standingsData && !scorersData" class="empty-state">
+        <div class="text-4xl mb-3">⚖️</div>
+        <p>Selecione uma liga e temporada, depois clique em <strong>Carregar Dados</strong>.</p>
+        <p class="text-xs text-gray-400 mt-2">Carrega classificação e artilheiros para comparar times e jogadores.</p>
+      </div>
+      <template v-else>
+
+        <!-- Seletor de modo + entidades -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+          <div class="flex items-center gap-3 flex-wrap">
+            <button
+              @click="comparisonMode = 'teams'; selectedCompTeams = []; selectedCompPlayers = []"
+              :class="comparisonMode === 'teams' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+              class="px-4 py-2 rounded-lg font-medium text-sm transition">
+              🏟️ Times
+            </button>
+            <button
+              @click="comparisonMode = 'players'; selectedCompTeams = []; selectedCompPlayers = []"
+              :class="comparisonMode === 'players' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+              class="px-4 py-2 rounded-lg font-medium text-sm transition">
+              👤 Jogadores
+            </button>
+            <span class="text-gray-400 text-xs ml-auto">Selecione 2 a 4 para comparar</span>
+          </div>
+
+          <!-- Times -->
+          <div v-if="comparisonMode === 'teams' && compTeamList.length" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-52 overflow-y-auto pr-1">
+            <label
+              v-for="t in compTeamList" :key="t.name"
+              class="flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition text-sm select-none"
+              :class="selectedCompTeams.includes(t.name)
+                ? 'border-blue-400 bg-blue-50 text-blue-800'
+                : 'border-gray-200 hover:bg-gray-50 text-gray-700'">
+              <input type="checkbox" :value="t.name" v-model="selectedCompTeams"
+                :disabled="!selectedCompTeams.includes(t.name) && selectedCompTeams.length >= 4"
+                class="w-3.5 h-3.5 accent-blue-500 flex-shrink-0" />
+              <span class="text-xs font-semibold text-gray-400 flex-shrink-0 w-6">{{ t.rank }}º</span>
+              <span class="truncate text-xs font-medium">{{ t.name }}</span>
+            </label>
+          </div>
+
+          <!-- Jogadores -->
+          <div v-if="comparisonMode === 'players' && compPlayerList.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-52 overflow-y-auto pr-1">
+            <label
+              v-for="p in compPlayerList" :key="p.name"
+              class="flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition text-sm select-none"
+              :class="selectedCompPlayers.includes(p.name)
+                ? 'border-blue-400 bg-blue-50 text-blue-800'
+                : 'border-gray-200 hover:bg-gray-50 text-gray-700'">
+              <input type="checkbox" :value="p.name" v-model="selectedCompPlayers"
+                :disabled="!selectedCompPlayers.includes(p.name) && selectedCompPlayers.length >= 4"
+                class="w-3.5 h-3.5 accent-blue-500 flex-shrink-0" />
+              <span class="truncate font-medium text-xs">{{ p.name }}</span>
+              <span class="text-gray-400 text-xs ml-auto flex-shrink-0 truncate max-w-[80px]">{{ p.team }}</span>
+            </label>
+          </div>
+
+          <p v-if="(comparisonMode === 'teams' && selectedCompTeams.length < 2) || (comparisonMode === 'players' && selectedCompPlayers.length < 2)"
+            class="text-gray-400 text-xs text-center pt-1">
+            Selecione pelo menos 2 {{ comparisonMode === 'teams' ? 'times' : 'jogadores' }} para ver os gráficos
+          </p>
+        </div>
+
+        <!-- Gráficos -->
+        <template v-if="(comparisonMode === 'teams' && selectedCompTeams.length >= 2) || (comparisonMode === 'players' && selectedCompPlayers.length >= 2)">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ChartBox title="🕸️ Radar Comparativo (normalizado 0–100)">
+              <canvas ref="compRadarCanvas"></canvas>
+            </ChartBox>
+            <ChartBox title="📊 Estatísticas Absolutas">
+              <canvas ref="compBarCanvas"></canvas>
+            </ChartBox>
+          </div>
+          <ChartBox :title="comparisonMode === 'teams' ? '🔵 Contexto na Liga — Pts/Jogo × Gols/Jogo' : '🔵 Contexto na Liga — Gols/Jogo × Assist./Jogo'">
+            <canvas ref="compContextCanvas"></canvas>
+          </ChartBox>
+
+          <!-- Tabela comparativa -->
+          <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+            <div class="px-5 py-4 border-b border-gray-200">
+              <h3 class="text-gray-900 font-semibold">
+                Tabela Comparativa —
+                <span class="text-blue-600">{{ comparisonMode === 'teams' ? 'Times' : 'Jogadores' }}</span>
+              </h3>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-100">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-gray-500 font-medium">Métrica</th>
+                    <th
+                      v-for="name in (comparisonMode === 'teams' ? selectedCompTeams : selectedCompPlayers)"
+                      :key="name"
+                      class="px-4 py-3 text-center text-gray-700 font-semibold text-xs">
+                      {{ name }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(row, i) in (comparisonMode === 'teams' ? compTeamsTableRows : compPlayersTableRows)"
+                    :key="i"
+                    class="border-t border-gray-200/50"
+                    :class="i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'">
+                    <td class="px-4 py-2.5 text-gray-500 font-medium text-xs">{{ row.label }}</td>
+                    <td
+                      v-for="v in row.values" :key="v.name"
+                      class="px-4 py-2.5 text-center font-semibold text-sm"
+                      :class="v.best ? 'text-emerald-600' : 'text-gray-700'">
+                      {{ v.display }}
+                      <span v-if="v.best" class="text-emerald-400 text-xs ml-0.5">★</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+
       </template>
     </div>
 
@@ -910,15 +1049,16 @@ export default {
     const multiligaSeason = ref('2024')
 
     const subTabs = [
-      { id: 'standings',   name: 'Classificação', icon: '📊' },
-      { id: 'topscorers',  name: 'Artilheiros',   icon: '🎯' },
-      { id: 'injuries',    name: 'Lesões',         icon: '🏥' },
-      { id: 'multiliga',   name: 'Multi-Liga',     icon: '🌍' },
-      { id: 'predictions', name: 'Previsões',      icon: '📈' },
-      { id: 'clusters',    name: 'Clusters',       icon: '🔵' },
-      { id: 'montecarlo',  name: 'Monte Carlo',    icon: '🎲' },
-      { id: 'zonas',       name: 'Zonas RF',       icon: '🏅' },
-      { id: 'arquetipos',  name: 'Arquétipos',     icon: '🎭' },
+      { id: 'standings',   name: 'Classificação', icon: '📊', group: 1 },
+      { id: 'topscorers',  name: 'Artilheiros',   icon: '🎯', group: 1 },
+      { id: 'injuries',    name: 'Lesões',         icon: '🏥', group: 2 },
+      { id: 'multiliga',   name: 'Multi-Liga',     icon: '🌍', group: 2 },
+      { id: 'predictions', name: 'Previsões',      icon: '📈', group: 2 },
+      { id: 'clusters',    name: 'Clusters',       icon: '🔵', group: 3 },
+      { id: 'montecarlo',  name: 'Monte Carlo',    icon: '🎲', group: 3 },
+      { id: 'zonas',       name: 'Zonas RF',       icon: '🏅', group: 4 },
+      { id: 'arquetipos',  name: 'Arquétipos',     icon: '🎭', group: 4 },
+      { id: 'comparacao',  name: 'Comparação',     icon: '⚖️', group: 5 },
     ]
 
     const activeAction = computed(() => {
@@ -931,6 +1071,7 @@ export default {
         arquetipos:  { icon: '🎭', label: 'Classificar Arquétipos' },
         clusters:    { icon: '🔵', label: 'Agrupar Times' },
         montecarlo:  { icon: '🎲', label: 'Simular Temporada' },
+        comparacao:  { icon: '⚖️', label: 'Carregar Dados' },
       }
       return map[activeSubTab.value] || { icon: '🔍', label: 'Carregar' }
     })
@@ -1039,7 +1180,98 @@ export default {
     const selectedZoneItem  = ref(null)
     const selectedArchItem  = ref(null)
 
+    // ── State: Comparação ─────────────────────────────────────────────────────
+    const comparisonMode      = ref('teams')
+    const selectedCompTeams   = ref([])
+    const selectedCompPlayers = ref([])
+
     const zoneColors = ['#f59e0b', '#3b82f6', '#6b7280', '#ef4444']
+
+    // ── Computeds: comparação ─────────────────────────────────────────────────
+    const compTeamList = computed(() => {
+      if (!standingsData.value?.items) return []
+      return [...standingsData.value.items].sort((a, b) => (a.rank || 0) - (b.rank || 0)).map(it => {
+        const all    = it.all || {}
+        const goals  = (typeof all === 'object' ? all.goals : null) || {}
+        const played = Math.max(parseFloat((typeof all === 'object' ? all.played : null) || 1), 1)
+        return {
+          name:          it.analysis.team_name,
+          rank:          it.rank || 0,
+          points:        parseFloat(it.points) || 0,
+          played,
+          pts_rate:      (parseFloat(it.points) || 0) / played,
+          attack_rate:   parseFloat(goals.for     || 0) / played,
+          defense_rate:  parseFloat(goals.against || 0) / played,
+          win_rate:      it.analysis.win_rate     || 0,
+          goals_for:     it.analysis.goals_for    || 0,
+          goals_against: it.analysis.goals_against|| 0,
+          goals_diff:    it.analysis.goals_diff   || 0,
+        }
+      })
+    })
+
+    const compPlayerList = computed(() => {
+      if (!scorersData.value?.items) return []
+      return [...scorersData.value.items].sort((a, b) => (b.goals || 0) - (a.goals || 0)).map(it => ({
+        name:         it.name,
+        team:         it.team,
+        goals:        it.goals        || 0,
+        assists:      it.assists      || 0,
+        appearances:  it.appearances  || 0,
+        gpg:          it.goals_per_game   || 0,
+        apg:          it.assists_per_game || 0,
+        contribution: it.contribution || 0,
+      }))
+    })
+
+    function _compBest(vals, higher) {
+      const nums = vals.map(v => parseFloat(v.raw) || 0)
+      return higher ? Math.max(...nums) : Math.min(...nums)
+    }
+
+    const compTeamsTableRows = computed(() => {
+      const sel = compTeamList.value.filter(t => selectedCompTeams.value.includes(t.name))
+      if (sel.length < 2) return []
+      const metrics = [
+        { label: 'Posição',         key: 'rank',          fmt: v => `${v}º`,                higher: false },
+        { label: 'Pontos',          key: 'points',        fmt: v => v,                       higher: true  },
+        { label: 'Pts/Jogo',        key: 'pts_rate',      fmt: v => v.toFixed(2),            higher: true  },
+        { label: 'Gols Marcados',   key: 'goals_for',     fmt: v => v,                       higher: true  },
+        { label: 'Gols Sofridos',   key: 'goals_against', fmt: v => v,                       higher: false },
+        { label: 'Gols Marc./Jogo', key: 'attack_rate',   fmt: v => v.toFixed(2),            higher: true  },
+        { label: 'Gols Sofr./Jogo', key: 'defense_rate',  fmt: v => v.toFixed(2),            higher: false },
+        { label: 'Vitórias %',      key: 'win_rate',      fmt: v => `${v.toFixed(1)}%`,      higher: true  },
+      ]
+      return metrics.map(m => {
+        const vals = sel.map(t => ({ name: t.name, raw: parseFloat(t[m.key]) || 0 }))
+        const best = _compBest(vals, m.higher)
+        return {
+          label: m.label,
+          values: vals.map(v => ({ name: v.name, display: m.fmt(v.raw), best: v.raw === best }))
+        }
+      })
+    })
+
+    const compPlayersTableRows = computed(() => {
+      const sel = compPlayerList.value.filter(p => selectedCompPlayers.value.includes(p.name))
+      if (sel.length < 2) return []
+      const metrics = [
+        { label: 'Gols',          key: 'goals',        fmt: v => v,            higher: true  },
+        { label: 'Assistências',  key: 'assists',      fmt: v => v,            higher: true  },
+        { label: 'Aparições',     key: 'appearances',  fmt: v => v,            higher: false },
+        { label: 'Gols/Jogo',     key: 'gpg',          fmt: v => v.toFixed(3), higher: true  },
+        { label: 'Assist./Jogo',  key: 'apg',          fmt: v => v.toFixed(3), higher: true  },
+        { label: 'Contribuição',  key: 'contribution', fmt: v => v,            higher: true  },
+      ]
+      return metrics.map(m => {
+        const vals = sel.map(p => ({ name: p.name, raw: parseFloat(p[m.key]) || 0 }))
+        const best = _compBest(vals, m.higher)
+        return {
+          label: m.label,
+          values: vals.map(v => ({ name: v.name, display: m.fmt(v.raw), best: v.raw === best }))
+        }
+      })
+    })
 
     const featLabelMap = {
       pts_rate: 'Pts/Jogo', attack_rate: 'Gols Marc./Jogo', defense_rate: 'Gols Sofr./Jogo',
@@ -1087,6 +1319,13 @@ export default {
     const archFeatCanvas         = ref(null)
     const archScatterCanvas      = ref(null)
     const archShapCanvas         = ref(null)
+    const compRadarCanvas        = ref(null)
+    const compBarCanvas          = ref(null)
+    const compContextCanvas      = ref(null)
+    const standingsBpCanvas      = ref(null)
+    const scorersBpCanvas        = ref(null)
+    const predictTrajCanvas      = ref(null)
+    const zoneScatterCanvas      = ref(null)
 
     const charts = {}
     const destroy = (k) => { if (charts[k]) { charts[k].destroy(); delete charts[k] } }
@@ -1104,6 +1343,305 @@ export default {
     })
     const ptColor  = (isOut) => isOut ? 'rgba(239,68,68,0.85)' : 'rgba(59,130,246,0.75)'
     const ptBorder = (isOut) => isOut ? 'rgba(239,68,68,1)'    : 'rgba(59,130,246,1)'
+
+    // ── Boxplot: plugin inline + helper ───────────────────────────────────────
+    function _computeBoxStats(vals) {
+      if (!vals?.length) return null
+      const sv = [...vals].sort((a, b) => a - b)
+      const n  = sv.length
+      return {
+        min:    sv[0],
+        q1:     sv[Math.floor(n * 0.25)],
+        median: sv[Math.floor(n * 0.50)],
+        q3:     sv[Math.floor(n * 0.75)],
+        max:    sv[n - 1],
+        mean:   Math.round(sv.reduce((s, v) => s + v, 0) / n * 100) / 100,
+      }
+    }
+
+    const _bpPlugin = {
+      id: '_bpPlugin',
+      afterDatasetsDraw(chart, _args, opts) {
+        if (!opts?.items?.length) return
+        const { ctx, scales: { x, y } } = chart
+        ctx.save()
+        opts.items.forEach((item, i) => {
+          const cx   = x.getPixelForValue(i)
+          const bw   = Math.min(56, (x.right - x.left) / opts.items.length * 0.55)
+          const ww   = bw * 0.35
+          const c    = item.color || '#6b7280'
+          const pMax = y.getPixelForValue(item.max)
+          const pQ3  = y.getPixelForValue(item.q3)
+          const pMed = y.getPixelForValue(item.median)
+          const pQ1  = y.getPixelForValue(item.q1)
+          const pMin = y.getPixelForValue(item.min)
+          const pAvg = item.mean != null ? y.getPixelForValue(item.mean) : null
+          // whisker line (dashed)
+          ctx.beginPath(); ctx.strokeStyle = c; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3])
+          ctx.moveTo(cx, pMax); ctx.lineTo(cx, pMin); ctx.stroke(); ctx.setLineDash([])
+          // whisker caps
+          ;[[pMin, ww], [pMax, ww]].forEach(([py, hw]) => {
+            ctx.beginPath(); ctx.strokeStyle = c; ctx.lineWidth = 1.5
+            ctx.moveTo(cx - hw, py); ctx.lineTo(cx + hw, py); ctx.stroke()
+          })
+          // IQR box
+          const boxH = pQ1 - pQ3
+          ctx.fillStyle = c + '28'; ctx.strokeStyle = c; ctx.lineWidth = 1.5
+          ctx.fillRect(cx - bw / 2, pQ3, bw, boxH)
+          ctx.strokeRect(cx - bw / 2, pQ3, bw, boxH)
+          // median line
+          ctx.beginPath(); ctx.strokeStyle = c; ctx.lineWidth = 2.5
+          ctx.moveTo(cx - bw / 2, pMed); ctx.lineTo(cx + bw / 2, pMed); ctx.stroke()
+          // mean dot (white fill + color border)
+          if (pAvg != null) {
+            ctx.beginPath(); ctx.fillStyle = '#fff'; ctx.strokeStyle = c; ctx.lineWidth = 1.5
+            ctx.arc(cx, pAvg, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+          }
+        })
+        ctx.restore()
+      }
+    }
+
+    function _buildBoxplot(key, canvasRef, items, yLabel = '') {
+      destroy(key)
+      const cv = canvasRef.value
+      if (!cv || !items?.length) return
+      const maxVal = Math.max(...items.map(i => i.max ?? 0)) * 1.18
+      charts[key] = new Chart(cv, {
+        type: 'bar',
+        data: {
+          labels: items.map(i => i.label),
+          datasets: [{ data: items.map(i => i.max ?? 0), backgroundColor: 'transparent', borderColor: 'transparent' }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { ...tip(), callbacks: {
+              title: ctx => items[ctx[0].dataIndex]?.label ?? '',
+              label: ctx => {
+                const it = items[ctx[0].dataIndex]
+                return [`Máx: ${it.max}`, `Q3: ${it.q3}`, `Mediana: ${it.median}`, `Q1: ${it.q1}`, `Mín: ${it.min}`, `Média: ${it.mean}`]
+              },
+            }},
+            _bpPlugin: { items },
+          },
+          scales: {
+            x: { ticks: { color: DARK.tick }, grid: { color: DARK.grid } },
+            y: {
+              min: 0, max: maxVal,
+              title: { display: !!yLabel, text: yLabel, color: DARK.title },
+              ticks: { color: DARK.tick }, grid: { color: DARK.grid },
+            },
+          },
+        },
+        plugins: [_bpPlugin],
+      })
+    }
+
+    // ── Build: Standings boxplot ──────────────────────────────────────────────
+    function buildStandingsBp() {
+      if (!standingsData.value) return
+      const items = standingsData.value.items
+      const n = items.length
+      const ZONE_NAMES  = ['Candidato ao Título', 'Zona Europeia', 'Meio-Tabela', 'Rebaixamento']
+      const ZONE_COLORS = ['#f59e0b', '#3b82f6', '#6b7280', '#ef4444']
+      const groups = [[], [], [], []]
+      items.forEach(it => {
+        const pct = (it.rank || 1) / n
+        const z   = pct <= 0.10 ? 0 : pct <= 0.30 ? 1 : pct <= 0.80 ? 2 : 3
+        groups[z].push(it.points || 0)
+      })
+      const bpItems = ZONE_NAMES.map((label, i) => {
+        const stats = _computeBoxStats(groups[i])
+        if (!stats) return null
+        return { label, color: ZONE_COLORS[i], ...stats }
+      }).filter(Boolean)
+      _buildBoxplot('standingsBp', standingsBpCanvas, bpItems, 'Pontos')
+    }
+
+    // ── Build: Scorers boxplot ────────────────────────────────────────────────
+    function buildScorersBp() {
+      if (!scorersData.value) return
+      const items    = scorersData.value.items
+      const all      = items.map(p => p.goals || 0)
+      const outliers = items.filter(p => p.analysis?.is_outlier).map(p => p.goals || 0)
+      const normals  = items.filter(p => !p.analysis?.is_outlier).map(p => p.goals || 0)
+      const bpItems = [
+        { label: 'Todos',     color: '#6b7280', ..._computeBoxStats(all) },
+        outliers.length >= 2 ? { label: 'Destaques', color: '#ef4444', ..._computeBoxStats(outliers) } : null,
+        normals.length  >= 2 ? { label: 'Regulares', color: '#3b82f6', ..._computeBoxStats(normals)  } : null,
+      ].filter(Boolean)
+      _buildBoxplot('scorersBp', scorersBpCanvas, bpItems, 'Gols')
+    }
+
+    // ── Build: Predictions trajectory line ────────────────────────────────────
+    function buildPredictTrajectory() {
+      destroy('predTraj')
+      const cv = predictTrajCanvas.value
+      if (!cv || !predictionsData.value) return
+      const totalGames = predictionsData.value.summary.total_games
+      const preds = [...predictionsData.value.predictions]
+        .sort((a, b) => b.projected_pts - a.projected_pts)
+        .slice(0, 8)
+      const TRAJ_COLORS = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#fb923c']
+      const checkpoints = [0, 0.25, 0.5, 0.75, 1.0].map(f => Math.round(f * totalGames))
+      const labels = ['Início', '25%', '50%', '75%', 'Final']
+      const datasets = preds.map((t, i) => {
+        const gp   = t.games_played || 0
+        const rate = t.points_rate  || 0
+        const data = checkpoints.map(g =>
+          g <= gp
+            ? Math.round(rate * g * 10) / 10
+            : Math.round((t.current_pts + (g - gp) * rate) * 10) / 10
+        )
+        return {
+          label:           t.name,
+          data,
+          borderColor:     TRAJ_COLORS[i],
+          backgroundColor: 'transparent',
+          borderWidth:     2,
+          tension:         0.1,
+          pointRadius:     [3, 2, 2, 2, 5],
+          pointHoverRadius: 8,
+        }
+      })
+      charts.predTraj = new Chart(cv, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: DARK.tick, boxWidth: 10, font: { size: 9 }, padding: 6 } },
+            tooltip: { ...tip(), mode: 'index', intersect: false, callbacks: {
+              label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y} pts`
+            }},
+          },
+          scales: {
+            x: { ticks: { color: DARK.tick }, grid: { color: DARK.grid } },
+            y: { title: { display: true, text: 'Pontos', color: DARK.title }, ticks: { color: DARK.tick }, grid: { color: DARK.grid } },
+          },
+        },
+      })
+    }
+
+    // ── Build: Zone scatter pts_rate × attack_rate ────────────────────────────
+    const _ZONE_LABELS = ['Candidato ao Título', 'Zona Europeia', 'Meio-Tabela', 'Rebaixamento']
+    const _ZONE_BG     = ['rgba(245,158,11,0.85)', 'rgba(59,130,246,0.85)', 'rgba(107,114,128,0.75)', 'rgba(239,68,68,0.85)']
+
+    function buildZoneScatter() {
+      destroy('zoneScatter')
+      const cv = zoneScatterCanvas.value
+      if (!cv || !zoneData.value) return
+      const items = zoneData.value.items
+      const datasets = [0, 1, 2, 3].map(z => ({
+        label:           _ZONE_LABELS[z],
+        data:            items.filter(it => it.rf_zone === z).map(it => ({
+          x: it.features.pts_rate, y: it.features.attack_rate, label: it.name,
+        })),
+        backgroundColor: _ZONE_BG[z],
+        borderColor:     _ZONE_BG[z].replace('0.85', '1').replace('0.75', '1'),
+        pointRadius: 9, pointHoverRadius: 13,
+      })).filter(ds => ds.data.length > 0)
+      charts.zoneScatter = new Chart(cv, {
+        type: 'scatter',
+        data: { datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: DARK.tick } },
+            tooltip: { ...tip(), callbacks: {
+              title: ctx => ctx[0]?.raw?.label ?? '',
+              label: ctx => [`Pts/Jogo: ${ctx.parsed.x.toFixed(2)}`, `Gols Marc./Jogo: ${ctx.parsed.y.toFixed(2)}`],
+            }},
+          },
+          scales: scales('Pontos/Jogo', 'Gols Marcados/Jogo'),
+        },
+      })
+    }
+
+    // ── Build: Comparison context scatter ────────────────────────────────────
+    function buildCompContext() {
+      destroy('compContext')
+      const cv = compContextCanvas.value
+      if (!cv) return
+      const isTeams = comparisonMode.value === 'teams'
+      if (isTeams) {
+        const sel      = selectedCompTeams.value
+        const unsel    = compTeamList.value.filter(t => !sel.includes(t.name))
+        const selItems = compTeamList.value.filter(t => sel.includes(t.name))
+        if (!compTeamList.value.length) return
+        charts.compContext = new Chart(cv, {
+          type: 'scatter',
+          data: {
+            datasets: [
+              {
+                label:           'Liga (outros)',
+                data:            unsel.map(t => ({ x: t.pts_rate, y: t.attack_rate, label: t.name })),
+                backgroundColor: 'rgba(156,163,175,0.35)',
+                borderColor:     'rgba(156,163,175,0.6)',
+                pointRadius: 5,
+              },
+              ...selItems.map((t, i) => ({
+                label:           t.name,
+                data:            [{ x: t.pts_rate, y: t.attack_rate, label: t.name }],
+                backgroundColor: COMP_COLORS[i % 4].bg,
+                borderColor:     COMP_COLORS[i % 4].border,
+                pointRadius: 12, pointHoverRadius: 16,
+              })),
+            ],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { labels: { color: DARK.tick, filter: item => item.datasetIndex > 0 } },
+              tooltip: { ...tip(), callbacks: {
+                title: ctx => ctx[0]?.raw?.label ?? '',
+                label: ctx => [`Pts/Jogo: ${ctx.parsed.x.toFixed(2)}`, `Gols/Jogo: ${ctx.parsed.y.toFixed(2)}`],
+              }},
+            },
+            scales: scales('Pontos/Jogo', 'Gols Marcados/Jogo'),
+          },
+        })
+      } else {
+        const sel      = selectedCompPlayers.value
+        const unsel    = compPlayerList.value.filter(p => !sel.includes(p.name))
+        const selItems = compPlayerList.value.filter(p => sel.includes(p.name))
+        if (!compPlayerList.value.length) return
+        charts.compContext = new Chart(cv, {
+          type: 'scatter',
+          data: {
+            datasets: [
+              {
+                label:           'Liga (outros)',
+                data:            unsel.map(p => ({ x: p.gpg, y: p.apg, label: p.name })),
+                backgroundColor: 'rgba(156,163,175,0.35)',
+                borderColor:     'rgba(156,163,175,0.6)',
+                pointRadius: 5,
+              },
+              ...selItems.map((p, i) => ({
+                label:           p.name,
+                data:            [{ x: p.gpg, y: p.apg, label: p.name }],
+                backgroundColor: COMP_COLORS[i % 4].bg,
+                borderColor:     COMP_COLORS[i % 4].border,
+                pointRadius: 12, pointHoverRadius: 16,
+              })),
+            ],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { labels: { color: DARK.tick, filter: item => item.datasetIndex > 0 } },
+              tooltip: { ...tip(), callbacks: {
+                title: ctx => ctx[0]?.raw?.label ?? '',
+                label: ctx => [`G/Jogo: ${ctx.parsed.x.toFixed(3)}`, `A/Jogo: ${ctx.parsed.y.toFixed(3)}`],
+              }},
+            },
+            scales: scales('Gols/Jogo', 'Assistências/Jogo'),
+          },
+        })
+      }
+    }
 
     // ── Build: Standings scatter ───────────────────────────────────────────────
     function buildStandingsScatter() {
@@ -1437,16 +1975,185 @@ export default {
       })
     }
 
+    // ── Build: Comparison charts ──────────────────────────────────────────────
+    const COMP_COLORS = [
+      { border: 'rgba(59,130,246,1)',   bg: 'rgba(59,130,246,0.8)'  },
+      { border: 'rgba(239,68,68,1)',    bg: 'rgba(239,68,68,0.8)'   },
+      { border: 'rgba(16,185,129,1)',   bg: 'rgba(16,185,129,0.8)'  },
+      { border: 'rgba(245,158,11,1)',   bg: 'rgba(245,158,11,0.8)'  },
+    ]
+
+    function _normalizeComp(items, metricKeys, invertSet = new Set()) {
+      const result = items.map(() => ({}))
+      metricKeys.forEach(key => {
+        const vals = items.map(it => parseFloat(it[key]) || 0)
+        const mn = Math.min(...vals), mx = Math.max(...vals)
+        vals.forEach((v, i) => {
+          let n = mx === mn ? 50 : (v - mn) / (mx - mn) * 100
+          if (invertSet.has(key)) n = 100 - n
+          result[i][key] = Math.round(n)
+        })
+      })
+      return result
+    }
+
+    function buildCompRadar() {
+      destroy('compRadar')
+      const cv = compRadarCanvas.value
+      if (!cv) return
+
+      if (comparisonMode.value === 'teams') {
+        const sel = compTeamList.value.filter(t => selectedCompTeams.value.includes(t.name))
+        if (sel.length < 2) return
+        const metrics = [
+          { key: 'pts_rate',    label: 'Pts/Jogo'       },
+          { key: 'attack_rate', label: 'Gols Marc./Jogo' },
+          { key: 'defense_rate',label: 'Gols Sofr./Jogo' },
+          { key: 'win_rate',    label: 'Vitórias %'      },
+          { key: 'goals_diff',  label: 'Saldo de Gols'   },
+        ]
+        const norm = _normalizeComp(sel, metrics.map(m => m.key), new Set(['defense_rate']))
+        charts.compRadar = new Chart(cv, {
+          type: 'radar',
+          data: {
+            labels: metrics.map(m => m.label),
+            datasets: sel.map((t, i) => ({
+              label:           t.name,
+              data:            metrics.map(m => norm[i][m.key]),
+              borderColor:     COMP_COLORS[i % 4].border,
+              backgroundColor: COMP_COLORS[i % 4].border.replace('1)', '0.12)'),
+              borderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
+            }))
+          },
+          options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: DARK.tick } }, tooltip: { ...tip() } },
+            scales: { r: {
+              min: 0, max: 100,
+              grid: { color: DARK.grid }, angleLines: { color: DARK.grid },
+              ticks: { color: DARK.tick, backdropColor: 'transparent', stepSize: 25 },
+              pointLabels: { color: DARK.title, font: { size: 11 } },
+            }}
+          }
+        })
+      } else {
+        const sel = compPlayerList.value.filter(p => selectedCompPlayers.value.includes(p.name))
+        if (sel.length < 2) return
+        const metrics = [
+          { key: 'goals',        label: 'Gols'       },
+          { key: 'assists',      label: 'Assist.'    },
+          { key: 'gpg',          label: 'G/Jogo'     },
+          { key: 'apg',          label: 'A/Jogo'     },
+          { key: 'contribution', label: 'Contribuição'},
+        ]
+        const norm = _normalizeComp(sel, metrics.map(m => m.key))
+        charts.compRadar = new Chart(cv, {
+          type: 'radar',
+          data: {
+            labels: metrics.map(m => m.label),
+            datasets: sel.map((p, i) => ({
+              label:           p.name,
+              data:            metrics.map(m => norm[i][m.key]),
+              borderColor:     COMP_COLORS[i % 4].border,
+              backgroundColor: COMP_COLORS[i % 4].border.replace('1)', '0.12)'),
+              borderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
+            }))
+          },
+          options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: DARK.tick } }, tooltip: { ...tip() } },
+            scales: { r: {
+              min: 0, max: 100,
+              grid: { color: DARK.grid }, angleLines: { color: DARK.grid },
+              ticks: { color: DARK.tick, backdropColor: 'transparent', stepSize: 25 },
+              pointLabels: { color: DARK.title, font: { size: 11 } },
+            }}
+          }
+        })
+      }
+    }
+
+    function buildCompBar() {
+      destroy('compBar')
+      const cv = compBarCanvas.value
+      if (!cv) return
+
+      if (comparisonMode.value === 'teams') {
+        const sel = compTeamList.value.filter(t => selectedCompTeams.value.includes(t.name))
+        if (sel.length < 2) return
+        const metrics = [
+          { key: 'points',        label: 'Pontos'       },
+          { key: 'goals_for',     label: 'Gols Marc.'   },
+          { key: 'goals_against', label: 'Gols Sofr.'   },
+          { key: 'win_rate',      label: 'Vitórias %'   },
+        ]
+        charts.compBar = new Chart(cv, {
+          type: 'bar',
+          data: {
+            labels: metrics.map(m => m.label),
+            datasets: sel.map((t, i) => ({
+              label:           t.name,
+              data:            metrics.map(m => parseFloat(t[m.key]) || 0),
+              backgroundColor: COMP_COLORS[i % 4].bg,
+              borderColor:     COMP_COLORS[i % 4].border,
+              borderWidth: 1.5, borderRadius: 4,
+            }))
+          },
+          options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: DARK.tick } }, tooltip: { ...tip() } },
+            scales: {
+              x: { ticks: { color: DARK.tick }, grid: { color: DARK.grid } },
+              y: { ticks: { color: DARK.tick }, grid: { color: DARK.grid } },
+            }
+          }
+        })
+      } else {
+        const sel = compPlayerList.value.filter(p => selectedCompPlayers.value.includes(p.name))
+        if (sel.length < 2) return
+        const metrics = [
+          { key: 'goals',        label: 'Gols'       },
+          { key: 'assists',      label: 'Assist.'    },
+          { key: 'gpg',          label: 'G/Jogo'     },
+          { key: 'apg',          label: 'A/Jogo'     },
+          { key: 'contribution', label: 'Contribuição'},
+        ]
+        charts.compBar = new Chart(cv, {
+          type: 'bar',
+          data: {
+            labels: metrics.map(m => m.label),
+            datasets: sel.map((p, i) => ({
+              label:           p.name,
+              data:            metrics.map(m => parseFloat(p[m.key]) || 0),
+              backgroundColor: COMP_COLORS[i % 4].bg,
+              borderColor:     COMP_COLORS[i % 4].border,
+              borderWidth: 1.5, borderRadius: 4,
+            }))
+          },
+          options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: DARK.tick } }, tooltip: { ...tip() } },
+            scales: {
+              x: { ticks: { color: DARK.tick }, grid: { color: DARK.grid } },
+              y: { ticks: { color: DARK.tick }, grid: { color: DARK.grid } },
+            }
+          }
+        })
+      }
+    }
+
+    watch([selectedCompTeams, selectedCompPlayers, comparisonMode], () => {
+      if (activeSubTab.value !== 'comparacao') return
+      nextTick(() => { buildCompRadar(); buildCompBar(); buildCompContext() })
+    }, { deep: true })
+
     // ── Build: Zone feature importance ────────────────────────────────────────
     function buildZoneFeat() {
       destroy('zoneFeat'); const cv = zoneFeatCanvas.value
       if (!cv || !zoneData.value) return
       const fi = zoneData.value.chart_data.feature_importance
+      const hasShap = fi.shap_values.some(v => Math.abs(v) > 0.001)
       charts.zoneFeat = new Chart(cv, {
         type: 'bar',
         data: { labels: fi.labels, datasets: [
           { label: 'RF Importance', data: fi.rf_values,   backgroundColor: 'rgba(59,130,246,0.75)',  borderRadius: 3 },
-          { label: 'SHAP Global',   data: fi.shap_values, backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 3 },
+          ...(hasShap ? [{ label: 'SHAP Global', data: fi.shap_values, backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 3 }] : []),
         ]},
         options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
           plugins: { legend: { labels: { color: DARK.tick } }, tooltip: { ...tip() } },
@@ -1503,11 +2210,12 @@ export default {
       destroy('archFeat'); const cv = archFeatCanvas.value
       if (!cv || !archetypeData.value) return
       const fi = archetypeData.value.chart_data.feature_importance
+      const hasShap = fi.shap_values.some(v => Math.abs(v) > 0.001)
       charts.archFeat = new Chart(cv, {
         type: 'bar',
         data: { labels: fi.labels, datasets: [
           { label: 'RF Importance', data: fi.rf_values,   backgroundColor: 'rgba(59,130,246,0.75)',  borderRadius: 3 },
-          { label: 'SHAP Global',   data: fi.shap_values, backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 3 },
+          ...(hasShap ? [{ label: 'SHAP Global', data: fi.shap_values, backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 3 }] : []),
         ]},
         options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
           plugins: { legend: { labels: { color: DARK.tick } }, tooltip: { ...tip() } },
@@ -1568,15 +2276,16 @@ export default {
 
     // ── Chart dispatch per sub-tab ────────────────────────────────────────────
     const rebuildChartsForTab = {
-      standings:   () => { buildStandingsScatter(); buildStandingsZScore() },
-      topscorers:  () => { buildScorersBubble();    buildScorersEff() },
+      standings:   () => { buildStandingsScatter(); buildStandingsZScore(); buildStandingsBp() },
+      topscorers:  () => { buildScorersBubble();    buildScorersEff();      buildScorersBp() },
       injuries:    () => { buildInjuriesTeam();      buildInjuriesType() },
       multiliga:   () => { buildMultiligaRadar();    buildMultiligaBars() },
-      predictions: () => { buildPredictScatter();    buildPredictBar() },
+      predictions: () => { buildPredictScatter();    buildPredictBar();     buildPredictTrajectory() },
       clusters:    () => { buildClustersScatter();   buildClustersBar() },
       montecarlo:  () => { buildMCChampionship();    buildMCPositions() },
-      zonas:       () => { buildZoneFeat();          buildZoneDist() },
+      zonas:       () => { buildZoneFeat();          buildZoneDist();       buildZoneScatter() },
       arquetipos:  () => { buildArchFeat();          buildArchScatter() },
+      comparacao:  () => { buildCompRadar();         buildCompBar();        buildCompContext() },
     }
 
     // ── Sub-tab switch ────────────────────────────────────────────────────────
@@ -1593,6 +2302,7 @@ export default {
           montecarlo:  mcData.value,
           zonas:       zoneData.value,
           arquetipos:  archetypeData.value,
+          comparacao:  standingsData.value || scorersData.value,
         }
         if (hasData[tab]) rebuildChartsForTab[tab]?.()
       })
@@ -1618,7 +2328,11 @@ export default {
           await runZones()
         } else if (activeSubTab.value === 'arquetipos') {
           await runArchetypes()
+        } else if (activeSubTab.value === 'comparacao') {
+          await runPhase1()
         }
+      } catch (e) {
+        error.value = `Erro: ${e.message}`
       } finally {
         phaseLoading.value = false
       }
@@ -1688,7 +2402,7 @@ export default {
       if (result?.error) { error.value = result.error; return }
       predictionsData.value = result
       await nextTick()
-      buildPredictScatter(); buildPredictBar()
+      buildPredictScatter(); buildPredictBar(); buildPredictTrajectory()
     }
 
     // ── Phase 3: clusters ─────────────────────────────────────────────────────
@@ -1718,7 +2432,7 @@ export default {
       if (result?.error) { error.value = result.error; return }
       zoneData.value = result
       await nextTick()
-      buildZoneFeat(); buildZoneDist()
+      buildZoneFeat(); buildZoneDist(); buildZoneScatter()
     }
 
     function selectZoneItem(item) {
@@ -1781,6 +2495,10 @@ export default {
       archFeatCanvas, archScatterCanvas, archShapCanvas,
       runZones, runArchetypes, selectZoneItem, selectArchItem,
       zoneBadgeCls, archBadgeCls, zoneColors, featLabelMap,
+      comparisonMode, selectedCompTeams, selectedCompPlayers,
+      compTeamList, compPlayerList, compTeamsTableRows, compPlayersTableRows,
+      compRadarCanvas, compBarCanvas, compContextCanvas,
+      standingsBpCanvas, scorersBpCanvas, predictTrajCanvas, zoneScatterCanvas,
     }
   }
 }

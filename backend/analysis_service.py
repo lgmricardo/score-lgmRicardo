@@ -375,7 +375,7 @@ def analyze_topscorers(scorers: List[Dict]) -> Dict:
             },
         })
 
-    items_by_score = sorted(items, key=lambda x: x["analysis"]["outlier_score"], reverse=True)
+    items_by_score = sorted(items, key=lambda x: x["goals"], reverse=True)
     outliers = [p for p in items if p["analysis"]["is_outlier"]]
 
     statistics = {

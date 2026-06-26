@@ -135,22 +135,18 @@
       </template>
 
       <template v-if="activeTab === 'standings'">
-        <div class="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
           <h2 class="text-xl font-bold text-gray-900 mb-4">📊 Tabela</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label class="block text-gray-600 text-sm mb-2">Liga</label>
+              <label class="block text-gray-500 text-xs uppercase tracking-wider mb-1">Liga</label>
               <select v-model="selectedLeagueId" class="w-full px-4 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500">
-                <option value="">Selecione</option>
-                <option value="39">Premier League (England)</option>
-                <option value="61">Ligue 1 (France)</option>
-                <option value="78">Bundesliga (Germany)</option>
-                <option value="135">Serie A (Italy)</option>
-                <option value="71">Serie A (Brazil)</option>
+                <option value="">Selecione uma liga</option>
+                <option v-for="l in leagues" :key="l.id" :value="String(l.id)">{{ l.name }} ({{ l.country }})</option>
               </select>
             </div>
             <div>
-              <label class="block text-gray-600 text-sm mb-2">Temporada</label>
+              <label class="block text-gray-500 text-xs uppercase tracking-wider mb-1">Temporada</label>
               <select v-model="selectedSeason" class="w-full px-4 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500">
                 <option value="">Selecione</option>
                 <option value="2024">2024</option>
@@ -158,59 +154,100 @@
               </select>
             </div>
           </div>
-          <button @click="loadStandings" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg mb-4 transition">
+          <button @click="loadStandings" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg mb-4 transition font-semibold">
             Carregar Tabela
           </button>
+
+          <!-- Legenda de zonas -->
+          <div v-if="standings.length > 0" class="flex flex-wrap gap-3 mb-3 text-xs">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-amber-200 border border-amber-400 inline-block"></span> Candidato ao Título</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-blue-100 border border-blue-300 inline-block"></span> Zona Europeia</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-gray-100 border border-gray-300 inline-block"></span> Meio-Tabela</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-red-100 border border-red-300 inline-block"></span> Rebaixamento</span>
+          </div>
+
           <div v-if="standings.length > 0" class="overflow-x-auto">
             <table class="w-full text-sm text-gray-900">
-              <tr class="bg-gray-100">
-                <th class="px-4 py-2 text-left text-gray-700">Pos</th>
-                <th class="px-4 py-2 text-left text-gray-700">Time</th>
-                <th class="px-4 py-2 text-gray-700">J</th>
-                <th class="px-4 py-2 text-gray-700">V</th>
-                <th class="px-4 py-2 text-gray-700">E</th>
-                <th class="px-4 py-2 text-gray-700">D</th>
-                <th class="px-4 py-2 text-gray-700">Pts</th>
-              </tr>
-              <tr v-for="team in standings" :key="team.team.id" class="border-b border-gray-200 cursor-pointer hover:bg-blue-50" @click="selectedTeam = team">
-                <td class="px-4 py-2 font-bold text-gray-900">{{ team.rank }}</td>
-                <td class="px-4 py-2 text-gray-900">{{ team.team.name }}</td>
-                <td class="px-4 py-2 text-center text-gray-700">{{ team.all.played }}</td>
-                <td class="px-4 py-2 text-center text-green-600">{{ team.all.win }}</td>
-                <td class="px-4 py-2 text-center text-amber-600">{{ team.all.draw }}</td>
-                <td class="px-4 py-2 text-center text-red-600">{{ team.all.lose }}</td>
-                <td class="px-4 py-2 text-center font-bold text-gray-900">{{ team.points }}</td>
-              </tr>
+              <thead>
+                <tr class="bg-gray-100">
+                  <th class="px-4 py-2 text-left text-gray-600 font-semibold">Pos</th>
+                  <th class="px-4 py-2 text-left text-gray-600 font-semibold">Time</th>
+                  <th class="px-4 py-2 text-center text-gray-600 font-semibold">J</th>
+                  <th class="px-4 py-2 text-center text-gray-600 font-semibold">V</th>
+                  <th class="px-4 py-2 text-center text-gray-600 font-semibold">E</th>
+                  <th class="px-4 py-2 text-center text-gray-600 font-semibold">D</th>
+                  <th class="px-4 py-2 text-center text-gray-600 font-semibold">GF</th>
+                  <th class="px-4 py-2 text-center text-gray-600 font-semibold">GC</th>
+                  <th class="px-4 py-2 text-center text-gray-600 font-semibold">Saldo</th>
+                  <th class="px-4 py-2 text-center text-gray-600 font-semibold">Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="team in standings"
+                  :key="team.team.id"
+                  class="border-b border-gray-200 cursor-pointer transition"
+                  :class="standingRowCls(team.rank)"
+                  @click="selectedTeam = team"
+                >
+                  <td class="px-4 py-2 font-bold text-gray-900">{{ team.rank }}</td>
+                  <td class="px-4 py-2 text-gray-900 font-medium">{{ team.team.name }}</td>
+                  <td class="px-4 py-2 text-center text-gray-700">{{ team.all.played }}</td>
+                  <td class="px-4 py-2 text-center text-green-600 font-medium">{{ team.all.win }}</td>
+                  <td class="px-4 py-2 text-center text-amber-600">{{ team.all.draw }}</td>
+                  <td class="px-4 py-2 text-center text-red-600">{{ team.all.lose }}</td>
+                  <td class="px-4 py-2 text-center text-emerald-600">{{ team.all.goals?.for ?? '—' }}</td>
+                  <td class="px-4 py-2 text-center text-red-500">{{ team.all.goals?.against ?? '—' }}</td>
+                  <td class="px-4 py-2 text-center font-semibold" :class="(team.goalsDiff || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'">
+                    {{ (team.goalsDiff || 0) >= 0 ? '+' : '' }}{{ team.goalsDiff ?? '—' }}
+                  </td>
+                  <td class="px-4 py-2 text-center font-bold text-gray-900">{{ team.points }}</td>
+                </tr>
+              </tbody>
             </table>
           </div>
         </div>
       </template>
 
       <template v-if="activeTab === 'topscorers'">
-        <div class="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
           <h2 class="text-xl font-bold text-gray-900 mb-4">🎯 Top Artilheiros</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <select v-model="selectedLeagueScorerssId" class="px-4 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500">
-              <option value="">Selecione Liga</option>
-              <option value="39">Premier League (England)</option>
-              <option value="61">Ligue 1 (France)</option>
-              <option value="78">Bundesliga (Germany)</option>
-              <option value="135">Serie A (Italy)</option>
-            </select>
-            <select v-model="selectedScorerssSeason" class="px-4 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500">
-              <option value="">Selecione Temporada</option>
-              <option value="2024">2024</option>
-              <option value="2023">2023</option>
-            </select>
+            <div>
+              <label class="block text-gray-500 text-xs uppercase tracking-wider mb-1">Liga</label>
+              <select v-model="selectedLeagueScorerssId" class="w-full px-4 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500">
+                <option value="">Selecione uma liga</option>
+                <option v-for="l in leagues" :key="l.id" :value="String(l.id)">{{ l.name }} ({{ l.country }})</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-gray-500 text-xs uppercase tracking-wider mb-1">Temporada</label>
+              <select v-model="selectedScorerssSeason" class="w-full px-4 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500">
+                <option value="">Selecione</option>
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+              </select>
+            </div>
           </div>
-          <button @click="loadTopscorers" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg mb-4 transition">
-            Carregar
+          <button @click="loadTopscorers" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg mb-4 transition font-semibold">
+            Carregar Artilheiros
           </button>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div v-for="(scorer, index) in topscorers" :key="scorer.player.id" class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-              <div class="text-3xl font-bold text-amber-600">{{ index + 1 }}. {{ scorer.statistics[0].goals.total }}</div>
+              <div class="flex items-start justify-between">
+                <span class="text-sm font-semibold text-gray-400">#{{ index + 1 }}</span>
+                <div class="text-right">
+                  <span class="text-3xl font-bold text-amber-600">{{ scorer.statistics[0].goals.total }}</span>
+                  <span class="text-sm font-medium text-amber-500 ml-1">gols</span>
+                </div>
+              </div>
               <p class="text-gray-900 font-medium mt-2">{{ scorer.player.name }}</p>
               <p class="text-gray-500 text-sm">{{ scorer.statistics[0].team.name }}</p>
+              <div class="mt-2 pt-2 border-t border-gray-100 flex gap-3 text-xs text-gray-500">
+                <span>🅰️ {{ scorer.statistics[0].goals.assists ?? 0 }} assist.</span>
+                <span>🎮 {{ scorer.statistics[0].games.appearences ?? 0 }} jogos</span>
+                <span>⚡ {{ scorer.statistics[0].games.appearences ? (scorer.statistics[0].goals.total / scorer.statistics[0].games.appearences).toFixed(2) : '—' }} g/jogo</span>
+              </div>
             </div>
           </div>
         </div>
@@ -328,9 +365,21 @@ export default {
     }
 
     function selectLeague(league) {
-      selectedLeagueId.value = league.id
+      selectedLeagueId.value = String(league.id)
       selectedSeason.value = '2024'
       activeTab.value = 'standings'
+    }
+
+    function standingRowCls(rank) {
+      const n = standings.value.length
+      if (!n) return 'hover:bg-gray-50'
+      const top1 = Math.max(1, Math.round(n * 0.10))
+      const top2 = Math.max(top1 + 1, Math.round(n * 0.30))
+      const top3 = Math.max(top2 + 1, Math.round(n * 0.80))
+      if (rank <= top1) return 'bg-amber-50 hover:bg-amber-100'
+      if (rank <= top2) return 'bg-blue-50 hover:bg-blue-100'
+      if (rank <= top3) return 'hover:bg-gray-50'
+      return 'bg-red-50 hover:bg-red-100'
     }
 
     function formatDate(dateString) {
@@ -354,7 +403,7 @@ export default {
       activeTab, loading, error, tabs, todayFixtures, nextFixtures, leagues, leagueSearch,
       filteredLeagues, selectedLeagueId, selectedSeason, standings, selectedLeagueScorerssId,
       selectedScorerssSeason, topscorers, loadStandings, loadTopscorers, selectLeague,
-      formatDate, formatTime, clearCache, selectedTeam
+      formatDate, formatTime, clearCache, selectedTeam, standingRowCls
     }
   }
 }

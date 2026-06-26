@@ -497,6 +497,40 @@ app.get('/analysis/monte-carlo/:league_id/:season', async (req, res) => {
   }
 });
 
+app.get('/analysis/zone-classifier/:league_id/:season', async (req, res) => {
+  try {
+    const { league_id, season } = req.params;
+    const cacheKey = `analysis_zones_${league_id}_${season}`;
+    if (isCacheValid(cacheKey)) {
+      console.log(`[CACHE] analysis/zone-classifier/${league_id}/${season}`);
+      return res.json(getCache(cacheKey));
+    }
+    const response = await axios.get(`${BACKEND_URL}/analysis/zone-classifier/${league_id}/${season}`);
+    setCache(cacheKey, response.data);
+    res.json(response.data);
+  } catch (error) {
+    console.error('[ERROR] analysis/zone-classifier:', error.message);
+    res.status(500).json({ error: 'Erro ao classificar zonas RF', message: error.message });
+  }
+});
+
+app.get('/analysis/player-archetypes/:league_id/:season', async (req, res) => {
+  try {
+    const { league_id, season } = req.params;
+    const cacheKey = `analysis_archetypes_${league_id}_${season}`;
+    if (isCacheValid(cacheKey)) {
+      console.log(`[CACHE] analysis/player-archetypes/${league_id}/${season}`);
+      return res.json(getCache(cacheKey));
+    }
+    const response = await axios.get(`${BACKEND_URL}/analysis/player-archetypes/${league_id}/${season}`);
+    setCache(cacheKey, response.data);
+    res.json(response.data);
+  } catch (error) {
+    console.error('[ERROR] analysis/player-archetypes:', error.message);
+    res.status(500).json({ error: 'Erro ao classificar arquétipos', message: error.message });
+  }
+});
+
 app.get('/fixtures/live', async (req, res) => {
   try {
     const LIVE_TTL = 30000;
