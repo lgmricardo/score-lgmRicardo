@@ -1,140 +1,86 @@
-# Football App ⚽🚀
+# Football App ⚽
 
-Uma aplicação web moderna para visualizar dados de futebol em tempo real usando a API-Football v3.
+Aplicação web moderna para visualização e análise de dados de futebol em tempo real via API-Football v3.
 
-**Stack:** Vue.js 3 (Frontend) + Express (BFF) + FastAPI (Backend)
+**Stack:** Vue.js 3 + Tailwind CSS (Frontend) · Express/Node.js (BFF) · FastAPI/Python (Backend)
 
 ---
 
-## 📋 Índice
+## Índice
 
 - [Requisitos](#requisitos)
-- [Instalação Passo a Passo](#instalação-passo-a-passo)
-- [Como Usar](#como-usar)
+- [Instalação](#instalação)
+- [Como Iniciar](#como-iniciar)
+- [Funcionalidades](#funcionalidades)
 - [Estrutura do Projeto](#estrutura-do-projeto)
 - [Endpoints da API](#endpoints-da-api)
+- [Variáveis de Ambiente](#variáveis-de-ambiente)
 - [Troubleshooting](#troubleshooting)
-- [Informações Técnicas](#informações-técnicas)
 
 ---
 
-## ✅ Requisitos
+## Requisitos
 
-### Mínimos do Sistema
+### Software
 
-- **macOS** 10.13+ (ou Linux/Windows com adaptações)
-- **RAM:** 4GB no mínimo
-- **Espaço em disco:** 500MB
-
-### Software Necessário
-
-| Software | Versão Mínima | Verificar |
-|----------|---------------|----------|
-| Python | 3.8+ | `python3 --version` |
-| Node.js | 16.0+ | `node --version` |
-| npm | 8.0+ | `npm --version` |
-| Git | 2.0+ | `git --version` |
+| Software | Versão mínima | Verificar |
+|----------|---------------|-----------|
+| Python   | 3.10+         | `python3 --version` |
+| Node.js  | 18.0+         | `node --version` |
+| npm      | 9.0+          | `npm --version` |
 
 ### Chave da API
 
-- **API-Football v3**: Obtenha em [api-sports.io](https://api-sports.io)
-- A chave será configurada no arquivo `.env` do backend
+Obtenha sua chave gratuita em [api-sports.io](https://api-sports.io) e configure em `backend/.env`.
 
 ---
 
-## 🛠️ Instalação Passo a Passo
+## Instalação
 
-### **PASSO 1: Verificar Dependências**
-
-Abra o Terminal e execute:
+### 1. Backend (FastAPI + Python)
 
 ```bash
-# Verificar Python
-python3 --version
-# Esperado: Python 3.8 ou superior
+cd backend
 
-# Verificar Node.js
-node --version
-# Esperado: v16.0 ou superior
-
-# Verificar npm
-npm --version
-# Esperado: 8.0 ou superior
-```
-
-Se alguma dependência estiver faltando, veja [Instalando Dependências](#instalando-dependências).
-
----
-
-### **PASSO 2: Clonar ou Extrair o Projeto**
-
-Se você recebeu um arquivo `.zip`:
-
-```bash
-# Navegue até a pasta Downloads (ou onde salvou)
-cd ~/Downloads
-
-# Descompacte
-unzip projeto-football.zip
-
-# Mova para o local desejado
-mv projeto-football /Users/SEU_USER/Documents/score-lgmRicardo/
-```
-
-Se o projeto já está em `score-lgmRicardo`, apenas navegue até lá:
-
-```bash
-cd /Users/SEU_USER/Documents/score-lgmRicardo
-```
-
----
-
-### **PASSO 3: Configurar Backend (FastAPI)**
-
-```bash
-# 1. Navegue até o backend
-cd /Users/SEU_USER/Documents/score-lgmRicardo/backend
-
-# 2. Criar ambiente virtual Python
+# Criar e ativar ambiente virtual
 python3 -m venv venv
+source venv/bin/activate        # macOS/Linux
+# venv\Scripts\activate         # Windows
 
-# 3. Ativar ambiente virtual
-source venv/bin/activate
-
-# Você deve ver "(venv)" no prompt do Terminal
-
-# 4. Instalar dependências
+# Instalar dependências
 pip install -r requirements.txt
 
-# 5. Criar arquivo .env com sua chave da API
+# Criar .env
 cat > .env << 'EOF'
-API_KEY=sua_chave_da_api_aqui
+API_KEY=sua_chave_aqui
 DEBUG=True
+CACHE_TTL=3600
 EOF
-
-# ⚠️ IMPORTANTE: Substitua "sua_chave_da_api_aqui" por sua chave real do api-sports.io
 ```
 
-**Arquivo `requirements.txt` esperado:**
+**Dependências Python (`requirements.txt`):**
 ```
 fastapi==0.104.1
 uvicorn==0.24.0
 httpx==0.25.2
 python-dotenv==1.0.0
+scikit-learn>=1.3.0
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.11.0
+shap>=0.41.0
 ```
+
+> A biblioteca `shap` é opcional — o sistema funciona sem ela, porém os valores SHAP ficam indisponíveis.
 
 ---
 
-### **PASSO 4: Configurar BFF (Express)**
+### 2. BFF — Back-For-Front (Express/Node.js)
 
 ```bash
-# 1. Navegue até o BFF
-cd /Users/SEU_USER/Documents/score-lgmRicardo/bff
-
-# 2. Instalar dependências npm
+cd bff
 npm install
 
-# 3. Criar arquivo .env
 cat > .env << 'EOF'
 BACKEND_URL=http://localhost:8000
 PORT=3001
@@ -142,488 +88,305 @@ NODE_ENV=development
 EOF
 ```
 
-**Pacotes npm que serão instalados:**
-```json
-{
-  "express": "^4.18.2",
-  "axios": "^1.6.1",
-  "cors": "^2.8.5",
-  "dotenv": "^16.3.1",
-  "nodemon": "^3.0.1"
-}
-```
-
 ---
 
-### **PASSO 5: Configurar Frontend (Vue.js)**
+### 3. Frontend (Vue.js 3 + Vite)
 
 ```bash
-# 1. Navegue até o frontend
-cd /Users/SEU_USER/Documents/score-lgmRicardo/frontend
-
-# 2. Instalar dependências npm
+cd frontend
 npm install
 
-# 3. Instalar Tailwind CSS
-npm install -D tailwindcss postcss autoprefixer
-
-# 4. Inicializar Tailwind
-npx tailwindcss init -p
-
-# 5. Criar arquivo .env
+# .env (opcional — a URL padrão já é localhost:3001)
 cat > .env << 'EOF'
 VITE_BFF_URL=http://localhost:3001
 EOF
 ```
 
-**Pacotes npm que serão instalados:**
-```json
-{
-  "vue": "^3.3.0",
-  "vite": "^5.0.0"
-}
-```
-
 ---
 
-### **PASSO 6: Instalar Script de Inicialização (Opcional)**
+## Como Iniciar
 
-Para facilitar, crie um script que inicia tudo automaticamente:
+### Opção A — Script automático (recomendado)
 
 ```bash
-# 1. Abra o nano para editar
-nano /Users/SEU_USER/Documents/score-lgmRicardo/start.sh
+# Dar permissão de execução (apenas na primeira vez)
+chmod +x start.sh
+
+# Iniciar todos os serviços
+./start.sh start
+
+# Outros comandos
+./start.sh stop       # Parar tudo
+./start.sh restart    # Reiniciar tudo
+./start.sh status     # Ver status de cada serviço
 ```
 
-Cole o conteúdo do script sofisticado (veja a seção anterior) e salve.
+O script abre abas no Terminal para cada serviço e verifica dependências automaticamente.
 
+### Opção B — Manual (3 terminais)
+
+**Terminal 1 — Backend:**
 ```bash
-# 2. Dê permissão de execução
-chmod +x /Users/SEU_USER/Documents/score-lgmRicardo/start.sh
-
-# 3. (Opcional) Crie um alias no .zshrc
-echo "alias startfootball='/Users/SEU_USER/Documents/score-lgmRicardo/start.sh'" >> ~/.zshrc
-source ~/.zshrc
-```
-
----
-
-## 🚀 Como Usar
-
-### **OPÇÃO A: Iniciar Manualmente (3 Terminais)**
-
-Abra **3 abas diferentes** no Terminal (⌘+T) e execute em cada uma:
-
-#### **Terminal 1 - Backend:**
-```bash
-cd /Users/SEU_USER/Documents/score-lgmRicardo/backend
+cd backend
 source venv/bin/activate
-uvicorn main:app --reload
+uvicorn main:app --reload --port 8000
 ```
 
-Você deve ver:
-```
-Uvicorn running on http://127.0.0.1:8000
-```
-
-#### **Terminal 2 - BFF:**
+**Terminal 2 — BFF:**
 ```bash
-cd /Users/SEU_USER/Documents/score-lgmRicardo/bff
+cd bff
 npm run dev
 ```
 
-Você deve ver:
-```
-Server running on port 3001
-```
-
-#### **Terminal 3 - Frontend:**
+**Terminal 3 — Frontend:**
 ```bash
-cd /Users/SEU_USER/Documents/score-lgmRicardo/frontend
+cd frontend
 npm run dev
 ```
 
-Você deve ver:
-```
-Local: http://localhost:5173
-```
+### Acessar a aplicação
+
+| Serviço          | URL                          |
+|------------------|------------------------------|
+| Frontend         | http://localhost:5173        |
+| BFF              | http://localhost:3001        |
+| Backend (FastAPI)| http://localhost:8000        |
+| API Docs (Swagger)| http://localhost:8000/docs  |
 
 ---
 
-### **OPÇÃO B: Iniciar com Script (Recomendado)**
+## Funcionalidades
 
-```bash
-# Menu interativo
-/Users/SEU_USER/Documents/score-lgmRicardo/start.sh
+### Dashboard
+Visão geral com partidas do dia, próximas partidas e ligas disponíveis.
 
-# Ou com alias
-startfootball
-```
+### Ao Vivo
+Partidas em andamento com atualização automática a cada 30 segundos. Exibe placar, minuto e status de cada jogo.
 
-**Comandos disponíveis:**
+### Ligas
+Listagem de todas as ligas disponíveis na API com busca por nome. Clique numa liga para ir direto à tabela de classificação.
 
-```bash
-startfootball start      # Iniciar todos os serviços
-startfootball stop       # Parar todos os serviços
-startfootball restart    # Reiniciar todos
-startfootball status     # Ver status de cada serviço
-```
+### Tabela de Classificação
+Classificação completa com vitórias, empates, derrotas e pontos. Clique em um time para abrir o **Perfil do Time** (painel lateral com forma recente e próximas partidas).
 
----
+Ligas disponíveis nos selects:
 
-### **PASSO 3: Acessar a Aplicação**
+| Liga | País | ID |
+|------|------|----|
+| Premier League | England | 39 |
+| Ligue 1 | France | 61 |
+| Bundesliga | Germany | 78 |
+| Serie A | Italy | 135 |
+| Serie A | Brazil | 71 |
 
-Abra seu navegador e acesse:
+### Artilheiros
+Top artilheiros por liga e temporada com total de gols.
 
-```
-http://localhost:5173
-```
+### Exportar Dados
+Exportação em CSV com filtros por liga, temporada, período de datas e campos selecionáveis. Tipos disponíveis: Partidas · Classificação · Artilheiros · Lesões.
 
-Você deve ver a interface com as opções:
-- 📊 Dashboard
-- 🏆 Ligas
-- 📋 Tabelas
-- ⚽ Artilheiros
+### Análise ML
+Motor de análise estatística e machine learning com os seguintes módulos:
 
----
-
-## 📖 Como Usar a Aplicação
-
-### **Dashboard**
-
-Na primeira aba, você pode visualizar:
-
-- **Próximas Partidas**: Jogos agendados para hoje
-- **Últimos Resultados**: Resultados mais recentes
-- **Filtros**: Pesquisar por time, data ou liga
-
-### **Ligas**
-
-Explore as principais ligas de futebol:
-
-- Premier League (Inglaterra)
-- La Liga (Espanha)
-- Serie A (Itália)
-- Bundesliga (Alemanha)
-- Ligue 1 (França)
-- Série A (Brasil)
-
-### **Tabelas**
-
-Visualize as tabelas de classificação:
-
-1. Selecione uma **liga** no dropdown
-2. Escolha a **temporada**
-3. Veja a tabela com:
-   - Posição
-   - Time
-   - Pontos
-   - Vitórias/Empates/Derrotas
-   - Gols
-
-### **Artilheiros**
-
-Confira os principais atacantes e assistentes:
-
-- Top Scorers
-- Top Assists
-- Top Yellow Cards
-- Top Red Cards
-
-Filtre por liga e temporada.
+| Sub-aba | Algoritmos |
+|---------|------------|
+| Classificação | Isolation Forest · Z-Score · LOF |
+| Artilheiros | Isolation Forest · Z-Score · LOF |
+| Lesões | Z-Score por time |
+| Multi-Liga | Comparação por radar e gols/jogo |
+| Previsões | Regressão Linear (R²) |
+| Clusters | K-Means (4 grupos: Ataque/Defesa/Pts) |
+| Monte Carlo | 10.000 simulações por liga |
+| Zonas RF | Random Forest + Logistic Regression + SHAP |
+| Arquétipos | Random Forest + Logistic Regression + SHAP |
 
 ---
 
-## 📁 Estrutura do Projeto
+## Estrutura do Projeto
 
 ```
 score-lgmRicardo/
 │
-├── backend/                    # FastAPI Backend (Python)
-│   ├── main.py                # App principal
-│   ├── requirements.txt        # Dependências Python
-│   ├── .env                   # Variáveis de ambiente
-│   └── venv/                  # Ambiente virtual (criado na instalação)
+├── backend/                        # FastAPI — Python
+│   ├── main.py                     # App principal e todos os endpoints
+│   ├── analysis_service.py         # Motor de ML e análise estatística
+│   ├── export_data.py              # Serviço de exportação CSV
+│   ├── cache_manager.py            # Cache em memória com TTL
+│   └── requirements.txt
 │
-├── bff/                        # BFF - Express (Node.js)
-│   ├── server.js              # Servidor Express
-│   ├── package.json           # Dependências npm
-│   ├── .env                   # Variáveis de ambiente
-│   └── node_modules/          # Pacotes (criado na instalação)
+├── bff/                            # Back-For-Front — Express/Node.js
+│   ├── server.js                   # Proxy com cache para o backend
+│   └── package.json
 │
-├── frontend/                   # Vue.js 3 Frontend
+├── frontend/                       # Vue.js 3 + Vite + Tailwind CSS
 │   ├── src/
-│   │   ├── App.vue           # Componente principal
-│   │   ├── main.js           # Entrada da app
-│   │   └── style.css         # Estilos globais
-│   ├── index.html            # HTML base
-│   ├── package.json          # Dependências npm
-│   ├── vite.config.js        # Config Vite
-│   ├── tailwind.config.js    # Config Tailwind CSS
-│   ├── postcss.config.js     # Config PostCSS
-│   ├── .env                  # Variáveis de ambiente
-│   └── node_modules/         # Pacotes (criado na instalação)
+│   │   ├── App.vue                 # Layout principal e navegação por abas
+│   │   ├── LiveTab.vue             # Partidas ao vivo (auto-refresh 30s)
+│   │   ├── ExportData.vue          # Exportação de dados em CSV
+│   │   ├── AnalyticsTab.vue        # Dashboard de análise ML (Chart.js)
+│   │   ├── TeamProfile.vue         # Painel lateral de perfil do time
+│   │   ├── main.js
+│   │   └── style.css
+│   ├── tailwind.config.js
+│   ├── vite.config.js
+│   └── package.json
 │
-├── start.sh                    # Script sofisticado de inicialização
-├── README.md                   # Este arquivo
-└── .gitignore                 # Arquivos ignorados pelo Git
+├── start.sh                        # Script de inicialização com menu
+└── README.md
 ```
 
 ---
 
-## 🔌 Endpoints da API
+## Endpoints da API
 
-### **Backend (FastAPI) - Porta 8000**
+### Backend (FastAPI) — porta 8000
 
-| Endpoint | Método | Descrição |
-|----------|--------|-----------|
-| `/docs` | GET | Documentação interativa (Swagger) |
-| `/fixtures/today` | GET | Partidas de hoje |
-| `/fixtures/next?days=7` | GET | Próximas partidas (próximos N dias) |
-| `/fixtures/results-today` | GET | Resultados de hoje |
-| `/fixtures/team/{team_id}` | GET | Partidas de um time |
-| `/standings/{league_id}/{season}` | GET | Tabela de uma liga |
-| `/teams/{league_id}/{season}` | GET | Times de uma liga |
-| `/players/topscorers/{league_id}/{season}` | GET | Top artilheiros |
-| `/players/topassists/{league_id}/{season}` | GET | Top assistentes |
-| `/leagues` | GET | Lista de ligas |
+**Dados gerais**
 
-**Exemplo de requisição:**
-```bash
-curl -X GET "http://localhost:8000/fixtures/today" \
-  -H "accept: application/json"
-```
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/health` | Status do backend |
+| GET | `/leagues` | Lista de ligas disponíveis |
+| GET | `/fixtures/today` | Partidas do dia |
+| GET | `/fixtures/next` | Próximas partidas |
+| GET | `/fixtures/live` | Partidas ao vivo |
+| GET | `/standings/{league_id}/{season}` | Tabela de classificação |
+| GET | `/players/topscorers/{league_id}/{season}` | Artilheiros |
+| GET | `/players/topassists/{league_id}/{season}` | Assistentes |
+| GET | `/team/profile/{team_id}/{season}` | Perfil e histórico do time |
 
-### **BFF (Express) - Porta 3001**
+**Análise ML**
 
-Mesmos endpoints do backend, com cache e formatação adicional.
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/analysis/standings/{league_id}/{season}` | Outliers na classificação |
+| GET | `/analysis/topscorers/{league_id}/{season}` | Outliers nos artilheiros |
+| GET | `/analysis/injuries/{league_id}/{season}` | Análise de lesões |
+| POST | `/analysis/compare-leagues` | Comparação multi-liga |
+| GET | `/analysis/predictions/{league_id}/{season}` | Previsão de pontos finais |
+| GET | `/analysis/clusters/{league_id}/{season}` | K-Means por time |
+| GET | `/analysis/monte-carlo/{league_id}/{season}` | 10k simulações de temporada |
+| GET | `/analysis/zone-classifier/{league_id}/{season}` | Zonas RF + SHAP por time |
+| GET | `/analysis/player-archetypes/{league_id}/{season}` | Arquétipos RF + SHAP por jogador |
 
-| Endpoint | Método | Descrição |
-|----------|--------|-----------|
-| `/health` | GET | Status da aplicação |
-| `/fixtures/today` | GET | Partidas de hoje |
-| `/standings/{league_id}/{season}` | GET | Tabela formatada |
-| ... | ... | (Mesmos do backend) |
+**Exportação**
 
----
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/export/leagues` | Ligas disponíveis para exportar |
+| POST | `/export/fixtures` | Exportar partidas |
+| POST | `/export/standings` | Exportar classificação |
+| POST | `/export/topscorers` | Exportar artilheiros |
+| POST | `/export/injuries` | Exportar lesões |
 
-## 🐛 Troubleshooting
+**Sistema**
 
-### **Problema: "Porta 8000 já está em uso"**
-
-```bash
-# Liberar a porta (macOS)
-lsof -ti:8000 | xargs kill -9
-
-# Ou mudar a porta no backend
-uvicorn main:app --reload --port 8001
-```
-
-### **Problema: "npm command not found"**
-
-```bash
-# Instalar Node.js via Homebrew
-brew install node
-
-# Ou fazer download em https://nodejs.org
-```
-
-### **Problema: "ModuleNotFoundError: No module named 'fastapi'"**
-
-```bash
-# Certifique-se de que o venv está ativado
-cd backend
-source venv/bin/activate
-
-# Reinstale as dependências
-pip install -r requirements.txt
-```
-
-### **Problema: "CORS error no navegador"**
-
-Verifique se:
-1. Backend está rodando em `http://localhost:8000`
-2. BFF está rodando em `http://localhost:3001`
-3. Frontend está rodando em `http://localhost:5173`
-
-Se tudo estiver rodando, reinicie com:
-```bash
-startfootball restart
-```
-
-### **Problema: "API Key inválida"**
-
-1. Verifique se sua chave está correta em `backend/.env`
-2. Acesse [api-sports.io](https://api-sports.io) e gere uma nova chave
-3. Reinicie o backend
-
-### **Problema: "Blank screen no navegador"**
-
-1. Abra o DevTools (F12)
-2. Verifique o console para erros
-3. Verifique o Network tab
-4. Se houver erro CORS, reinicie os serviços
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/cache/stats` | Estatísticas do cache |
+| GET | `/docs` | Documentação interativa (Swagger UI) |
 
 ---
 
-## 💻 Informações Técnicas
+## Variáveis de Ambiente
 
-### **Versões Utilizadas**
-
-```
-Python: 3.8+
-Node.js: 16.0+
-npm: 8.0+
-Vue.js: 3.3+
-FastAPI: 0.104.1
-Express: 4.18.2
-Tailwind CSS: 3.x
-```
-
-### **Portas Utilizadas**
-
-| Serviço | Porta | URL |
-|---------|-------|-----|
-| Backend (FastAPI) | 8000 | http://localhost:8000 |
-| BFF (Express) | 3001 | http://localhost:3001 |
-| Frontend (Vite) | 5173 | http://localhost:5173 |
-
-### **Arquitetura**
-
-```
-┌──────────────┐
-│   Browser    │
-│ (localhost   │
-│    :5173)    │
-└──────┬───────┘
-       │ HTTP
-       ▼
-┌──────────────┐
-│  Vue.js 3    │
-│  Frontend    │
-└──────┬───────┘
-       │ HTTP
-       ▼
-┌──────────────┐
-│   Express    │
-│  (BFF)       │
-│  :3001       │
-└──────┬───────┘
-       │ HTTP
-       ▼
-┌──────────────┐
-│   FastAPI    │
-│  Backend     │
-│   :8000      │
-└──────┬───────┘
-       │ HTTPS
-       ▼
-┌──────────────┐
-│ API-Football │
-│   v3 API     │
-└──────────────┘
-```
-
-### **Caching**
-
-- Backend: Cache em memória (1 hora)
-- BFF: Cache em memória (1 hora)
-- Frontend: Cache local do navegador
-
-### **Variáveis de Ambiente**
-
-#### Backend (`.env`)
-```
-API_KEY=sua_chave_aqui
+### `backend/.env`
+```env
+API_KEY=sua_chave_do_api_sports_aqui
 DEBUG=True
 CACHE_TTL=3600
 ```
 
-#### BFF (`.env`)
-```
+### `bff/.env`
+```env
 BACKEND_URL=http://localhost:8000
 PORT=3001
 NODE_ENV=development
-CACHE_TTL=3600
 ```
 
-#### Frontend (`.env`)
-```
+### `frontend/.env` (opcional)
+```env
 VITE_BFF_URL=http://localhost:3001
 ```
 
 ---
 
-## 📞 Suporte
+## Troubleshooting
 
-### **Recursos Úteis**
-
-- [API-Football Docs](https://api-sports.io/documentation/football)
-- [FastAPI Docs](https://fastapi.tiangolo.com/)
-- [Vue.js 3 Docs](https://vuejs.org/)
-- [Express Docs](https://expressjs.com/)
-- [Tailwind CSS Docs](https://tailwindcss.com/)
-
-### **Verificar Logs**
-
-Cada terminal mostra os logs em tempo real:
+### Porta em uso
 
 ```bash
-# Backend
-# Logs de requisições, erros, e status HTTP
+# Verificar qual processo usa a porta
+lsof -i :8000
 
-# BFF
-# Logs de requisições, cache, e erros
-
-# Frontend
-# Logs de build, desenvolvimento, e erros no console
+# Encerrar processo
+lsof -ti:8000 | xargs kill -9
 ```
 
+### `ModuleNotFoundError` no Python
+
+```bash
+cd backend
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### `npm: command not found`
+
+```bash
+# Instalar via Homebrew (macOS)
+brew install node
+```
+
+### SHAP não disponível
+
+A análise SHAP requer a biblioteca `shap`, que tem dependências nativas. Se falhar na instalação:
+
+```bash
+# Instalar manualmente
+pip install shap
+
+# Se houver erro de compilação, instale Xcode Command Line Tools (macOS)
+xcode-select --install
+```
+
+O sistema funciona normalmente sem o SHAP — os valores SHAP ficam exibidos como "não disponível".
+
+### Tela em branco no navegador
+
+1. Abra o DevTools (`F12`) e verifique o console
+2. Confirme que backend (`:8000`) e BFF (`:3001`) estão respondendo
+3. Reinicie com `./start.sh restart`
+
+### API Key inválida
+
+1. Verifique `backend/.env` — a variável deve se chamar `API_KEY`
+2. Acesse [api-sports.io](https://api-sports.io) para gerar ou verificar sua chave
+3. Reinicie o backend após alterar o `.env`
+
 ---
 
-## 📝 Notas Importantes
+## Arquitetura
 
-⚠️ **Antes de começar:**
+```
+Navegador (:5173)
+     │
+     ▼
+Vue.js 3 + Tailwind CSS
+     │  HTTP
+     ▼
+Express BFF (:3001)   ←── cache em memória
+     │  HTTP
+     ▼
+FastAPI (:8000)        ←── cache em memória + análise ML
+     │  HTTPS
+     ▼
+API-Football v3
+```
 
-1. Você precisa de uma chave válida do [api-sports.io](https://api-sports.io)
-2. Verifique se as portas 8000, 3001 e 5173 estão livres
-3. A internet deve estar ativa (requisições para API externa)
-4. Python 3.8+ e Node.js 16.0+ são obrigatórios
-
-✅ **Quando tudo estiver funcionando:**
-
-- Backend estará em: `http://localhost:8000` (com docs em `/docs`)
-- BFF estará em: `http://localhost:3001`
-- Frontend estará em: `http://localhost:5173`
-- Os dados virão da API-Football em tempo real
+**Fluxo de dados:**  
+O frontend nunca acessa a API-Football diretamente. Todo tráfego passa pelo BFF (que adiciona cache) → Backend (que processa e enriquece os dados com ML).
 
 ---
-
-## 📄 Licença
-
-Este projeto é fornecido como está, para fins educacionais.
-
----
-
-## 👨‍💻 Desenvolvido com ❤️
-
-Football App - Uma forma moderna de acompanhar futebol mundial.
 
 **Última atualização:** Junho 2026
-
----
-
-## 🎯 Próximos Passos
-
-Depois de instalado, você pode:
-
-1. ✅ Explorar a interface
-2. ✅ Adicionar mais ligas
-3. ✅ Customizar os estilos (Tailwind CSS)
-4. ✅ Adicionar mais endpoints na API
-5. ✅ Integrar banco de dados (MongoDB, PostgreSQL)
-6. ✅ Fazer deploy em um servidor
-
----
-
-**Aproveite a aplicação!** ⚽🚀

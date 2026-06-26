@@ -36,7 +36,9 @@
       "Bash(npm run *)",
       "Bash(curl -s \"http://localhost:3001/analysis/injuries/39/2024\")",
       "Bash(curl -s \"http://localhost:3001/analysis/predictions/39/2024\")",
-      "Bash(curl -s -X POST http://localhost:3001/analysis/compare-leagues -H 'Content-Type: application/json' -d '{\"leagues\":[{\"id\":39,\"name\":\"Premier League\",\"season\":\"2024\"},{\"id\":78,\"name\":\"Bundesliga\",\"season\":\"2024\"},{\"id\":135,\"name\":\"Serie A\",\"season\":\"2024\"}]}')"
+      "Bash(curl -s -X POST http://localhost:3001/analysis/compare-leagues -H 'Content-Type: application/json' -d '{\"leagues\":[{\"id\":39,\"name\":\"Premier League\",\"season\":\"2024\"},{\"id\":78,\"name\":\"Bundesliga\",\"season\":\"2024\"},{\"id\":135,\"name\":\"Serie A\",\"season\":\"2024\"}]}')",
+      "Bash(python3 -c \"import sklearn; print\\('sklearn', sklearn.__version__\\)\")",
+      "Bash(python3 -c \"import shap; print\\('shap', shap.__version__\\)\")"
     ]
   }
 }

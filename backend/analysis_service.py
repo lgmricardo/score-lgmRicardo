@@ -5,11 +5,22 @@ Outlier detection using Isolation Forest, Z-Score, and Local Outlier Factor.
 
 import numpy as np
 from scipy import stats
-from sklearn.ensemble import IsolationForest
+from sklearn.ensemble import IsolationForest, RandomForestClassifier
 from sklearn.neighbors import LocalOutlierFactor
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, LogisticRegression as _LogReg
 from sklearn.preprocessing import StandardScaler
 from typing import List, Dict, Tuple
+
+try:
+    import shap as _shap_lib
+    _HAS_SHAP = True
+except ImportError:
+    _HAS_SHAP = False
+
+_ZONE_LABELS = ["Candidato ao Título", "Zona Europeia", "Meio de Tabela", "Zona de Rebaixamento"]
+_ZONE_COLORS = ["#f59e0b", "#3b82f6", "#6b7280", "#ef4444"]
+_ARCH_LABELS = ["Artilheiro Puro", "Polivalente", "Criador", "Contribuição Limitada"]
+_ARCH_COLORS = ["#ef4444", "#10b981", "#3b82f6", "#6b7280"]
 
 
 # ============================================================================
@@ -1090,3 +1101,375 @@ def monte_carlo_season(standings: List[Dict], n_simulations: int = 10_000) -> Di
             },
         },
     }
+
+
+# ============================================================================
+# SHARED HELPERS — RF + LR + SHAP
+# ============================================================================
+
+def _zone_from_rank(rank: int, n: int) -> int:
+    title_cut    = max(1, round(n * 0.10))
+    european_cut = max(title_cut + 1, round(n * 0.30))
+    midtable_cut = max(european_cut + 1, round(n * 0.80))
+    if rank <= title_cut:
+        return 0
+    if rank <= european_cut:
+        return 1
+    if rank <= midtable_cut:
+        return 2
+    return 3
+
+
+def _feat_label(fn: str) -> str:
+    return {
+        "pts_rate":       "Pts/Jogo",
+        "attack_rate":    "Gols Marc./Jogo",
+        "defense_rate":   "Gols Sofr./Jogo",
+        "win_rate":       "Taxa de Vitórias",
+        "goal_diff_rate": "Saldo/Jogo",
+        "goals":          "Gols Totais",
+        "assists":        "Assistências",
+        "gpg":            "Gols/Jogo",
+        "apg":            "Assist./Jogo",
+        "contribution":   "Contribuição",
+    }.get(fn, fn)
+
+
+def _compute_shap(rf: RandomForestClassifier, X_scaled: np.ndarray,
+                  feature_names: List[str], predicted_classes: np.ndarray):
+    per_sample: List[Dict] = [{} for _ in range(len(X_scaled))]
+    global_imp: Dict[str, float] = {fn: 0.0 for fn in feature_names}
+
+    if not _HAS_SHAP:
+        return per_sample, global_imp
+
+    try:
+        explainer   = _shap_lib.TreeExplainer(rf)
+        shap_values = explainer.shap_values(X_scaled)
+
+        classes = list(rf.classes_)
+        for i in range(len(X_scaled)):
+            pred_idx = classes.index(int(predicted_classes[i]))
+            sv = shap_values[pred_idx][i]
+            per_sample[i] = {fn: round(float(sv[j]), 4) for j, fn in enumerate(feature_names)}
+            for j, fn in enumerate(feature_names):
+                global_imp[fn] += abs(float(sv[j]))
+
+        total = sum(global_imp.values()) or 1.0
+        global_imp = {k: round(v / total, 4) for k, v in global_imp.items()}
+    except Exception:
+        pass
+
+    return per_sample, global_imp
+
+
+def _build_explanation(shap_i: Dict, feature_names: List[str]) -> Tuple[str, str]:
+    if not shap_i:
+        return feature_names[0], "Sem valores SHAP disponíveis."
+    main = max(shap_i, key=lambda k: abs(shap_i[k]))
+    val  = shap_i[main]
+    direction = "alta" if val > 0 else "baixa"
+    return main, f"{_feat_label(main)} {direction} ({val:+.2f} SHAP) é o principal fator."
+
+
+def _proba_full(proba_row: np.ndarray, classes: np.ndarray, n_zones: int = 4) -> Dict[int, float]:
+    d = {i: 0.0 for i in range(n_zones)}
+    for ci, c in enumerate(classes):
+        d[int(c)] = round(float(proba_row[ci]), 4)
+    return d
+
+
+# ============================================================================
+# ZONE CLASSIFIER (Random Forest + Logistic Regression + SHAP) — TIMES
+# ============================================================================
+
+def classify_team_zones(standings: List[Dict]) -> Dict:
+    if not standings or len(standings) < 5:
+        return {"error": "Dados insuficientes (mínimo 5 times)"}
+
+    n = len(standings)
+    feature_names = ["pts_rate", "attack_rate", "defense_rate", "win_rate", "goal_diff_rate"]
+    names, feat_rows, zones = [], [], []
+
+    for s in standings:
+        team  = s.get("team", {})
+        all_s = s.get("all", {}) if isinstance(s.get("all"), dict) else {}
+        goals = all_s.get("goals", {}) if isinstance(all_s, dict) else {}
+        pl    = max(float(all_s.get("played", 1) or 1) if isinstance(all_s, dict) else 1.0, 1.0)
+        pts   = float(s.get("points", 0) or 0)
+        gf    = float(goals.get("for",     0) or 0)
+        ga    = float(goals.get("against", 0) or 0)
+        wins  = float(all_s.get("win", 0) or 0) if isinstance(all_s, dict) else 0.0
+        rank  = int(s.get("rank", n) or n)
+
+        names.append(team.get("name", "?") if isinstance(team, dict) else str(team))
+        feat_rows.append([pts/pl, gf/pl, ga/pl, wins/pl, (gf - ga)/pl])
+        zones.append(_zone_from_rank(rank, n))
+
+    X = np.array(feat_rows, dtype=float)
+    y = np.array(zones)
+
+    scaler   = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    rf = RandomForestClassifier(n_estimators=200, class_weight="balanced", random_state=42)
+    rf.fit(X_scaled, y)
+    rf_pred  = rf.predict(X_scaled)
+    rf_proba = rf.predict_proba(X_scaled)
+
+    lr = _LogReg(max_iter=2000, class_weight="balanced", random_state=42, solver="lbfgs")
+    lr.fit(X_scaled, y)
+    lr_pred  = lr.predict(X_scaled)
+    lr_proba = lr.predict_proba(X_scaled)
+
+    rf_importance = {fn: round(float(rf.feature_importances_[j]), 4) for j, fn in enumerate(feature_names)}
+    shap_per, shap_global = _compute_shap(rf, X_scaled, feature_names, rf_pred)
+
+    items = []
+    for i in range(n):
+        main_driver, explanation = _build_explanation(shap_per[i], feature_names)
+        items.append({
+            "rank":              int(standings[i].get("rank", i + 1) or i + 1),
+            "name":              names[i],
+            "actual_zone":       int(zones[i]),
+            "actual_zone_label": _ZONE_LABELS[zones[i]],
+            "rf_zone":           int(rf_pred[i]),
+            "rf_zone_label":     _ZONE_LABELS[int(rf_pred[i])],
+            "lr_zone":           int(lr_pred[i]),
+            "lr_zone_label":     _ZONE_LABELS[int(lr_pred[i])],
+            "rf_proba":          _proba_full(rf_proba[i], rf.classes_),
+            "lr_proba":          _proba_full(lr_proba[i], lr.classes_),
+            "features":          {fn: round(float(X[i][j]), 3) for j, fn in enumerate(feature_names)},
+            "shap":              shap_per[i],
+            "main_driver":       main_driver,
+            "main_driver_label": _feat_label(main_driver),
+            "explanation":       explanation,
+        })
+
+    items_by_rank = sorted(items, key=lambda x: x["rank"])
+    zone_counts   = [len([it for it in items if it["actual_zone"] == z]) for z in range(4)]
+
+    return {
+        "total_teams":            n,
+        "zone_legend":            [{"id": i, "label": _ZONE_LABELS[i], "color": _ZONE_COLORS[i]} for i in range(4)],
+        "rf_feature_importance":  rf_importance,
+        "shap_global_importance": shap_global,
+        "items":    items_by_rank,
+        "insights": _zone_insights(items_by_rank, rf_importance, shap_global),
+        "chart_data": {
+            "feature_importance": {
+                "labels":      [_feat_label(fn) for fn in feature_names],
+                "rf_values":   [rf_importance[fn] for fn in feature_names],
+                "shap_values": [shap_global.get(fn, 0.0) for fn in feature_names],
+            },
+            "zone_distribution": {
+                "labels": _ZONE_LABELS,
+                "counts": zone_counts,
+                "colors": _ZONE_COLORS,
+            },
+        },
+        "models": {
+            "rf_accuracy":  round(float(np.mean(rf_pred == y)), 3),
+            "lr_accuracy":  round(float(np.mean(lr_pred == y)), 3),
+            "shap_enabled": _HAS_SHAP,
+            "note":         "Acurácia in-sample (treino = teste, ~20 times).",
+        },
+    }
+
+
+def _zone_insights(items: List[Dict], rf_imp: Dict, shap_imp: Dict) -> List[str]:
+    insights = []
+    top_rf = max(rf_imp, key=rf_imp.get)
+    insights.append(
+        f"Feature mais importante (RF): {_feat_label(top_rf)} "
+        f"({rf_imp[top_rf]*100:.0f}% da importância global)."
+    )
+    if any(v > 0 for v in shap_imp.values()):
+        top_shap = max(shap_imp, key=shap_imp.get)
+        insights.append(
+            f"Principal driver SHAP médio: {_feat_label(top_shap)} "
+            f"({shap_imp[top_shap]*100:.0f}% da explicação)."
+        )
+    disagreements = [it for it in items if it["rf_zone"] != it["actual_zone"]]
+    if disagreements:
+        ns = ", ".join(it["name"] for it in disagreements[:3])
+        insights.append(
+            f"{len(disagreements)} time(s) com zona RF diferente do rank: {ns}. "
+            "Desempenho estatístico descolado da posição na tabela."
+        )
+    else:
+        insights.append(
+            "RF e rank coincidem para todos os times — desempenho estatístico alinhado à posição."
+        )
+    rf_lr = [it for it in items if it["rf_zone"] != it["lr_zone"]]
+    if rf_lr:
+        insights.append(
+            f"RF e Regressão Logística discordam em {len(rf_lr)} time(s) — "
+            "perfil estatístico ambíguo entre zonas."
+        )
+    return insights
+
+
+# ============================================================================
+# ARCHETYPE CLASSIFIER (Random Forest + Logistic Regression + SHAP) — JOGADORES
+# ============================================================================
+
+def _assign_archetype(gpg: float, apg: float, gpg_p60: float, apg_p60: float) -> int:
+    high_g = gpg >= gpg_p60
+    high_a = apg >= apg_p60
+    if high_g and high_a:
+        return 1   # Polivalente
+    if high_g:
+        return 0   # Artilheiro Puro
+    if high_a:
+        return 2   # Criador
+    return 3       # Contribuição Limitada
+
+
+def classify_player_archetypes(scorers: List[Dict]) -> Dict:
+    if not scorers or len(scorers) < 5:
+        return {"error": "Dados insuficientes (mínimo 5 jogadores)"}
+
+    feature_names = ["goals", "assists", "gpg", "apg", "contribution"]
+    names, teams, feat_rows = [], [], []
+
+    for s in scorers:
+        player  = s.get("player", {})
+        stat    = s.get("statistics", [{}])[0] if s.get("statistics") else {}
+        g_stat  = stat.get("goals", {})
+        gm_stat = stat.get("games", {})
+        t_stat  = stat.get("team", {})
+
+        goals   = float(g_stat.get("total",      0) or 0)
+        assists = float(g_stat.get("assists",     0) or 0)
+        apps    = max(float(gm_stat.get("appearences", 0) or 0), 1.0)
+
+        names.append(player.get("name", "?") if isinstance(player, dict) else str(player))
+        teams.append(t_stat.get("name", "?")  if isinstance(t_stat, dict)  else str(t_stat))
+        feat_rows.append([goals, assists, goals / apps, assists / apps, goals + assists])
+
+    X       = np.array(feat_rows, dtype=float)
+    gpg_p60 = float(np.percentile(X[:, 2], 60))
+    apg_p60 = float(np.percentile(X[:, 3], 60))
+    y       = np.array([_assign_archetype(float(X[i, 2]), float(X[i, 3]), gpg_p60, apg_p60)
+                        for i in range(len(names))])
+
+    scaler   = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    rf = RandomForestClassifier(n_estimators=200, class_weight="balanced", random_state=42)
+    rf.fit(X_scaled, y)
+    rf_pred  = rf.predict(X_scaled)
+    rf_proba = rf.predict_proba(X_scaled)
+
+    lr = _LogReg(max_iter=2000, class_weight="balanced", random_state=42, solver="lbfgs")
+    lr.fit(X_scaled, y)
+    lr_pred  = lr.predict(X_scaled)
+    lr_proba = lr.predict_proba(X_scaled)
+
+    rf_importance = {fn: round(float(rf.feature_importances_[j]), 4) for j, fn in enumerate(feature_names)}
+    shap_per, shap_global = _compute_shap(rf, X_scaled, feature_names, rf_pred)
+
+    items = []
+    for i in range(len(names)):
+        main_driver, explanation = _build_explanation(shap_per[i], feature_names)
+        items.append({
+            "rank":                  i + 1,
+            "name":                  names[i],
+            "team":                  teams[i],
+            "actual_archetype":      int(y[i]),
+            "actual_archetype_label":_ARCH_LABELS[int(y[i])],
+            "rf_archetype":          int(rf_pred[i]),
+            "rf_archetype_label":    _ARCH_LABELS[int(rf_pred[i])],
+            "lr_archetype":          int(lr_pred[i]),
+            "lr_archetype_label":    _ARCH_LABELS[int(lr_pred[i])],
+            "rf_proba":              _proba_full(rf_proba[i], rf.classes_),
+            "lr_proba":              _proba_full(lr_proba[i], lr.classes_),
+            "features": {
+                "goals":        int(feat_rows[i][0]),
+                "assists":      int(feat_rows[i][1]),
+                "gpg":          round(feat_rows[i][2], 3),
+                "apg":          round(feat_rows[i][3], 3),
+                "contribution": int(feat_rows[i][4]),
+            },
+            "shap":              shap_per[i],
+            "main_driver":       main_driver,
+            "main_driver_label": _feat_label(main_driver),
+            "explanation":       explanation,
+        })
+
+    items_sorted = sorted(items, key=lambda x: x["features"]["goals"], reverse=True)
+    arch_groups  = [
+        {
+            "id":      ai,
+            "label":   _ARCH_LABELS[ai],
+            "color":   _ARCH_COLORS[ai],
+            "count":   int(np.sum(y == ai)),
+            "players": [it["name"] for it in items if it["actual_archetype"] == ai],
+        }
+        for ai in range(4)
+    ]
+
+    return {
+        "total_players":          len(names),
+        "archetype_legend":       [{"id": i, "label": _ARCH_LABELS[i], "color": _ARCH_COLORS[i]} for i in range(4)],
+        "rf_feature_importance":  rf_importance,
+        "shap_global_importance": shap_global,
+        "archetypes":  arch_groups,
+        "items":       items_sorted,
+        "insights":    _archetype_insights(items_sorted, rf_importance, shap_global),
+        "chart_data": {
+            "feature_importance": {
+                "labels":      [_feat_label(fn) for fn in feature_names],
+                "rf_values":   [rf_importance[fn] for fn in feature_names],
+                "shap_values": [shap_global.get(fn, 0.0) for fn in feature_names],
+            },
+            "scatter": [
+                {
+                    "x":              round(float(X[i, 2]), 3),
+                    "y":              round(float(X[i, 3]), 3),
+                    "label":          names[i],
+                    "archetype":      int(y[i]),
+                    "archetype_label":_ARCH_LABELS[int(y[i])],
+                    "color":          _ARCH_COLORS[int(y[i])],
+                }
+                for i in range(len(names))
+            ],
+            "archetype_distribution": {
+                "labels": _ARCH_LABELS,
+                "counts": [ag["count"] for ag in arch_groups],
+                "colors": _ARCH_COLORS,
+            },
+        },
+        "models": {
+            "rf_accuracy":  round(float(np.mean(rf_pred == y)), 3),
+            "lr_accuracy":  round(float(np.mean(lr_pred == y)), 3),
+            "shap_enabled": _HAS_SHAP,
+            "note":         "Acurácia in-sample (treino = teste).",
+        },
+    }
+
+
+def _archetype_insights(items: List[Dict], rf_imp: Dict, shap_imp: Dict) -> List[str]:
+    insights = []
+    top_rf = max(rf_imp, key=rf_imp.get)
+    insights.append(
+        f"Feature mais decisiva (RF): {_feat_label(top_rf)} ({rf_imp[top_rf]*100:.0f}% da importância)."
+    )
+    if any(v > 0 for v in shap_imp.values()):
+        top_shap = max(shap_imp, key=shap_imp.get)
+        insights.append(
+            f"Principal driver SHAP: {_feat_label(top_shap)} ({shap_imp[top_shap]*100:.0f}% da explicação média)."
+        )
+    mismatches = [it for it in items if it["rf_archetype"] != it["actual_archetype"]]
+    if mismatches:
+        ns = ", ".join(it["name"] for it in mismatches[:2])
+        insights.append(
+            f"{len(mismatches)} jogador(es) com arquétipo RF diferente do esperado: {ns}. Perfil híbrido."
+        )
+    rf_lr = [it for it in items if it["rf_archetype"] != it["lr_archetype"]]
+    if rf_lr:
+        insights.append(
+            f"RF e Regressão Logística divergem em {len(rf_lr)} jogador(es) — perfil limítrofe entre arquétipos."
+        )
+    return insights

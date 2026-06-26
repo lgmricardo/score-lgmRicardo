@@ -29,19 +29,22 @@ except ImportError:
 
 try:
     from analysis_service import (
-        analyze_standings   as ml_analyze_standings,
-        analyze_topscorers  as ml_analyze_topscorers,
-        analyze_injuries    as ml_analyze_injuries,
-        compare_leagues     as ml_compare_leagues,
-        predict_season      as ml_predict_season,
-        cluster_teams       as ml_cluster_teams,
-        monte_carlo_season  as ml_monte_carlo_season,
+        analyze_standings        as ml_analyze_standings,
+        analyze_topscorers       as ml_analyze_topscorers,
+        analyze_injuries         as ml_analyze_injuries,
+        compare_leagues          as ml_compare_leagues,
+        predict_season           as ml_predict_season,
+        cluster_teams            as ml_cluster_teams,
+        monte_carlo_season       as ml_monte_carlo_season,
+        classify_team_zones      as ml_classify_zones,
+        classify_player_archetypes as ml_classify_archetypes,
     )
 except ImportError:
     print("⚠️  analysis_service.py não encontrado. Endpoints de análise desabilitados.")
     ml_analyze_standings = ml_analyze_topscorers = None
     ml_analyze_injuries  = ml_compare_leagues = ml_predict_season = None
     ml_cluster_teams = ml_monte_carlo_season = None
+    ml_classify_zones = ml_classify_archetypes = None
 
 # ============================================================================
 # CONFIGURAÇÕES
@@ -563,6 +566,58 @@ async def get_analysis_monte_carlo(league_id: str, season: str):
         return {"error": "Sem dados de classificação para esta liga/temporada"}
 
     analysis = ml_monte_carlo_season(standings)
+    cache[cache_key] = (datetime.now().timestamp(), analysis)
+    return analysis
+
+
+@app.get("/analysis/zone-classifier/{league_id}/{season}")
+async def get_analysis_zones(league_id: str, season: str):
+    """Classificação de times por zona competitiva (Random Forest + Logistic Regression + SHAP)"""
+    if not ml_classify_zones:
+        return JSONResponse(status_code=503, content={"error": "Serviço de análise indisponível"})
+
+    cache_key = f"analysis_zones_{league_id}_{season}"
+    if is_cache_valid(cache_key):
+        _, data = cache[cache_key]
+        return data
+
+    result = await fazer_requisicao("standings", {"league": league_id, "season": season})
+    if not result:
+        return JSONResponse(status_code=502, content={"error": "Falha na API externa"})
+
+    standings = []
+    for item in result.get("response", []):
+        for group in item.get("league", {}).get("standings", []):
+            standings.extend(group)
+
+    if not standings:
+        return {"error": "Sem dados de classificação para esta liga/temporada"}
+
+    analysis = ml_classify_zones(standings)
+    cache[cache_key] = (datetime.now().timestamp(), analysis)
+    return analysis
+
+
+@app.get("/analysis/player-archetypes/{league_id}/{season}")
+async def get_analysis_archetypes(league_id: str, season: str):
+    """Classificação de jogadores por arquétipo (Random Forest + Logistic Regression + SHAP)"""
+    if not ml_classify_archetypes:
+        return JSONResponse(status_code=503, content={"error": "Serviço de análise indisponível"})
+
+    cache_key = f"analysis_archetypes_{league_id}_{season}"
+    if is_cache_valid(cache_key):
+        _, data = cache[cache_key]
+        return data
+
+    result = await fazer_requisicao("players/topscorers", {"league": league_id, "season": season})
+    if not result:
+        return JSONResponse(status_code=502, content={"error": "Falha na API externa"})
+
+    scorers = result.get("response", [])
+    if not scorers:
+        return {"error": "Sem dados de artilheiros para esta liga/temporada"}
+
+    analysis = ml_classify_archetypes(scorers)
     cache[cache_key] = (datetime.now().timestamp(), analysis)
     return analysis
 

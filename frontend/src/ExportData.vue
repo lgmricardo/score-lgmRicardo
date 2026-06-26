@@ -1,10 +1,10 @@
 <template>
   <div class="p-6 space-y-6">
-    <h2 class="text-2xl font-bold text-white">Exportar Dados</h2>
+    <h2 class="text-2xl font-bold text-gray-900">Exportar Dados</h2>
 
     <!-- Tipo de dado -->
-    <div class="bg-slate-800 rounded-xl p-5">
-      <p class="text-slate-400 text-sm font-medium mb-3 uppercase tracking-wide">Tipo de dado</p>
+    <div class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+      <p class="text-gray-500 text-sm font-medium mb-3 uppercase tracking-wide">Tipo de dado</p>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <button
           v-for="type in dataTypes"
@@ -14,7 +14,7 @@
             'px-4 py-3 rounded-lg text-sm font-medium transition text-left border',
             selectedType?.id === type.id
               ? 'bg-blue-600 border-blue-500 text-white'
-              : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-blue-500 hover:text-white'
+              : 'bg-gray-50 border-gray-200 text-gray-700 hover:border-blue-400 hover:text-blue-700'
           ]"
         >
           <span class="block text-lg mb-1">{{ type.icon }}</span>
@@ -24,21 +24,21 @@
     </div>
 
     <!-- Liga e Temporada -->
-    <div v-if="selectedType" class="bg-slate-800 rounded-xl p-5 space-y-4">
-      <p class="text-slate-400 text-sm font-medium uppercase tracking-wide">Filtros</p>
+    <div v-if="selectedType" class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm space-y-4">
+      <p class="text-gray-500 text-sm font-medium uppercase tracking-wide">Filtros</p>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label class="block text-slate-300 text-sm mb-2">Liga</label>
-          <select v-model="selectedLeague" class="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-blue-500">
+          <label class="block text-gray-700 text-sm mb-2">Liga</label>
+          <select v-model="selectedLeague" class="w-full px-3 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500">
             <option value="">Selecione uma liga</option>
             <option v-for="l in leagues" :key="l.id" :value="l.id">
-              {{ l.name }} — {{ l.country }}
+              {{ l.name }} ({{ l.country }})
             </option>
           </select>
         </div>
         <div>
-          <label class="block text-slate-300 text-sm mb-2">Temporada</label>
-          <select v-model="selectedSeason" class="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-blue-500">
+          <label class="block text-gray-700 text-sm mb-2">Temporada</label>
+          <select v-model="selectedSeason" class="w-full px-3 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500">
             <option value="">Selecione uma temporada</option>
             <option v-for="s in seasons" :key="s" :value="s">{{ s }}</option>
           </select>
@@ -48,33 +48,33 @@
       <!-- Datas (somente Fixtures) -->
       <div v-if="selectedType.id === '1'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label class="block text-slate-300 text-sm mb-2">Data inicial</label>
+          <label class="block text-gray-700 text-sm mb-2">Data inicial</label>
           <input
             type="date"
             v-model="fromDate"
-            class="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-blue-500"
+            class="w-full px-3 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500"
           />
         </div>
         <div>
-          <label class="block text-slate-300 text-sm mb-2">Data final</label>
+          <label class="block text-gray-700 text-sm mb-2">Data final</label>
           <input
             type="date"
             v-model="toDate"
-            class="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-blue-500"
+            class="w-full px-3 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500"
           />
         </div>
       </div>
     </div>
 
     <!-- Campos (checkboxes) -->
-    <div v-if="selectedType" class="bg-slate-800 rounded-xl p-5">
+    <div v-if="selectedType" class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
       <div class="flex items-center justify-between mb-4">
-        <p class="text-slate-400 text-sm font-medium uppercase tracking-wide">Informações a exportar</p>
+        <p class="text-gray-500 text-sm font-medium uppercase tracking-wide">Informações a exportar</p>
         <div class="flex gap-2">
-          <button @click="selectAll" class="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition">
+          <button @click="selectAll" class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition">
             Todos
           </button>
-          <button @click="clearAll" class="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition">
+          <button @click="clearAll" class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition">
             Nenhum
           </button>
         </div>
@@ -89,9 +89,9 @@
             type="checkbox"
             :value="field.key"
             v-model="selectedFields"
-            class="w-4 h-4 rounded border-slate-500 text-blue-600 bg-slate-700 focus:ring-blue-500 focus:ring-offset-slate-800 cursor-pointer"
+            class="w-4 h-4 rounded border-gray-300 text-blue-600 bg-white focus:ring-blue-500 cursor-pointer"
           />
-          <span class="text-sm text-slate-300 group-hover:text-white transition select-none">
+          <span class="text-sm text-gray-700 group-hover:text-gray-900 transition select-none">
             {{ field.label }}
           </span>
         </label>
@@ -109,16 +109,16 @@
         <span v-else>📥</span>
         {{ loading ? 'Exportando...' : 'Exportar CSV' }}
       </button>
-      <span v-if="selectedFields.length === 0" class="text-amber-400 text-sm">
+      <span v-if="selectedFields.length === 0" class="text-amber-600 text-sm">
         Selecione ao menos um campo
       </span>
-      <span v-else-if="!selectedLeague" class="text-amber-400 text-sm">
+      <span v-else-if="!selectedLeague" class="text-amber-600 text-sm">
         Selecione uma liga
       </span>
-      <span v-else-if="!selectedSeason" class="text-amber-400 text-sm">
+      <span v-else-if="!selectedSeason" class="text-amber-600 text-sm">
         Selecione uma temporada
       </span>
-      <span v-else-if="selectedType.id === '1' && (!fromDate || !toDate)" class="text-amber-400 text-sm">
+      <span v-else-if="selectedType.id === '1' && (!fromDate || !toDate)" class="text-amber-600 text-sm">
         Informe o período de datas
       </span>
     </div>
@@ -128,7 +128,7 @@
       v-if="message"
       :class="[
         'px-4 py-3 rounded-xl text-sm font-medium',
-        messageType === 'success' ? 'bg-green-900/50 border border-green-700 text-green-300' : 'bg-red-900/50 border border-red-700 text-red-300'
+        messageType === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
       ]"
     >
       {{ message }}
@@ -304,7 +304,7 @@ export default {
           { id: 61, name: 'Ligue 1', country: 'France' },
           { id: 78, name: 'Bundesliga', country: 'Germany' },
           { id: 135, name: 'Serie A', country: 'Italy' },
-          { id: 71, name: 'Série A', country: 'Brazil' },
+          { id: 71, name: 'Serie A', country: 'Brazil' },
           { id: 140, name: 'La Liga', country: 'Spain' },
         ]
       }
